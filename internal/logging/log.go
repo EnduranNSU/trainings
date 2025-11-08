@@ -12,7 +12,7 @@ func MarshalLogData(data any) []byte {
 }
 
 const (
-	user_info = "user_info_service"
+	user_info = "trainings_service"
 )
 
 func Error(err error, operation string, jsonData []byte, message string) {
