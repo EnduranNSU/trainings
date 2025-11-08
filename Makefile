@@ -3,13 +3,16 @@ sqlc:
 	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	@cd config && sqlc generate
 
+swag:
+	@go run github.com/swaggo/swag/cmd/swag@latest init -g internal/adapter/in/http/router.go --output docs/ --parseDependency --parseInternal
+
 # Generating code
-gen: sqlc
+gen: sqlc swag
 	@echo "Generating code..."
 	echo "Code generated successfully"
 
 # Install dependencies
-deps: gen
+deps:
 	@echo "Installing dependencies..."
 	@go generate ./...
 	@go mod download
