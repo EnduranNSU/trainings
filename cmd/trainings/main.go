@@ -9,6 +9,7 @@ import (
 	"github.com/EnduranNSU/trainings/internal/adapter/out/postgres"
 	"github.com/EnduranNSU/trainings/internal/app"
 	"github.com/EnduranNSU/trainings/internal/logging"
+	svc "github.com/EnduranNSU/trainings/internal/service"
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/lib/pq"
 	"github.com/num30/config"
@@ -38,7 +39,8 @@ func main() {
 
 	err := config.NewConfReader(configName).WithPrefix("APP").Read(&cfg)
 	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("failed to load config")
+		log.Fatal().Stack().Err(err).
+		Str("service", "trainings").Msg("failed to load config")
 	}
 
 	// Setup logger
@@ -50,7 +52,8 @@ func main() {
 			"user=%s password=%s dbname=%s sslmode=disable host=%s port=%d",
 			cfg.Db.User, cfg.Db.Password, cfg.Db.Dbname, cfg.Db.Host, cfg.Db.Port))
 	if err != nil {
-		log.Fatal().Stack().Err(err).Msgf("Failed to connect to database: %v", err)
+		log.Fatal().Stack().Err(err).
+		Str("service", "trainings").Msgf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
@@ -58,12 +61,23 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		log.Fatal().Stack().Err(err).Msgf("Failed to ping database: %v", err)
+		log.Fatal().Stack().Err(err).
+		Str("service", "trainings").Msgf("Failed to ping database: %v", err)
 	}
 
 	// Init repo - теперь без возврата ошибки
-	_ = postgres.NewTrainingRepository(db)
-	_ = postgres.NewExerciseRepository(db)
+	trepo := postgres.NewTrainingRepository(db)
+	erepo := postgres.NewExerciseRepository(db)
+
+	tsvc := svc.NewTrainingService(trepo)
+	esvc := svc.NewExerciseService(erepo)
+
+	srv := app.SetupServer(tsvc, esvc, cfg.Http.Addr)
+	
+	if err := srv.StartServer(); err != nil {
+		log.Fatal().Err(err).
+		Str("service", "trainings").Msg("http server stopped")
+	}
 }
 
 func toLoggerConfig(cfg app.LoggerConfig) logging.Config {
