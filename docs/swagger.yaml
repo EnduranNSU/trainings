@@ -6,6 +6,9 @@ definitions:
         maximum: 20
         minimum: 1
         type: integer
+      doing:
+        example: 1h
+        type: string
       exercise_id:
         example: 1
         minimum: 1
@@ -18,8 +21,11 @@ definitions:
         maximum: 100
         minimum: 1
         type: integer
+      rest:
+        example: 30m
+        type: string
       time:
-        example: "2023-10-05T15:30:00Z"
+        example: 1h30m
         type: string
       training_id:
         example: 1
@@ -44,13 +50,16 @@ definitions:
     type: object
   github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.CreateTrainingRequest:
     properties:
-      done:
+      actual_date:
+        example: "2023-10-05T16:30:00Z"
+        type: string
+      finished_at:
         example: "2023-10-05T16:30:00Z"
         type: string
       is_done:
         example: false
         type: boolean
-      planned:
+      planned_date:
         example: "2023-10-05T15:00:00Z"
         type: string
       rating:
@@ -58,15 +67,24 @@ definitions:
         maximum: 5
         minimum: 1
         type: integer
-      total_time:
+      started_at:
+        example: "2023-10-05T15:00:00Z"
+        type: string
+      total_duration:
         example: 1h30m
+        type: string
+      total_exercise_time:
+        example: 1h
+        type: string
+      total_rest_time:
+        example: 30m
         type: string
       user_id:
         example: 550e8400-e29b-41d4-a716-446655440000
         format: uuid
         type: string
     required:
-    - planned
+    - planned_date
     - user_id
     type: object
   github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.ErrorResponse:
@@ -107,6 +125,9 @@ definitions:
       approaches:
         example: 3
         type: integer
+      doing:
+        example: 1h
+        type: string
       exercise_id:
         example: 1
         type: integer
@@ -119,8 +140,11 @@ definitions:
       reps:
         example: 10
         type: integer
+      rest:
+        example: 30m
+        type: string
       time:
-        example: "2023-10-05T15:30:00Z"
+        example: 1h30m
         type: string
       training_id:
         example: 1
@@ -131,27 +155,39 @@ definitions:
     type: object
   github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.TrainingResponse:
     properties:
-      done:
+      actual_date:
         example: "2023-10-05T16:30:00Z"
         type: string
       exercises:
         items:
           $ref: '#/definitions/github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.TrainedExerciseResponse'
         type: array
+      finished_at:
+        example: "2023-10-05T16:30:00Z"
+        type: string
       id:
         example: 1
         type: integer
       is_done:
         example: true
         type: boolean
-      planned:
+      planned_date:
         example: "2023-10-05T15:00:00Z"
         type: string
       rating:
         example: 5
         type: integer
-      total_time:
+      started_at:
+        example: "2023-10-05T15:00:00Z"
+        type: string
+      total_duration:
         example: 1h30m
+        type: string
+      total_exercise_time:
+        example: 1h
+        type: string
+      total_rest_time:
+        example: 30m
         type: string
       user_id:
         example: 550e8400-e29b-41d4-a716-446655440000
@@ -182,10 +218,9 @@ definitions:
         maximum: 20
         minimum: 1
         type: integer
-      id:
-        example: 1
-        minimum: 1
-        type: integer
+      doing:
+        example: 1h15m
+        type: string
       notes:
         example: Стало легче
         type: string
@@ -194,30 +229,30 @@ definitions:
         maximum: 100
         minimum: 1
         type: integer
+      rest:
+        example: 30m
+        type: string
       time:
-        example: "2023-10-05T15:45:00Z"
+        example: 1h45m
         type: string
       weight:
         example: 55
         maximum: 1000
         minimum: 0
         type: number
-    required:
-    - id
     type: object
   github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.UpdateTrainingRequest:
     properties:
-      done:
+      actual_date:
         example: "2023-10-05T16:30:00Z"
         type: string
-      id:
-        example: 1
-        minimum: 1
-        type: integer
+      finished_at:
+        example: "2023-10-05T16:30:00Z"
+        type: string
       is_done:
         example: true
         type: boolean
-      planned:
+      planned_date:
         example: "2023-10-05T15:00:00Z"
         type: string
       rating:
@@ -225,12 +260,20 @@ definitions:
         maximum: 5
         minimum: 1
         type: integer
-      total_time:
+      started_at:
+        example: "2023-10-05T15:00:00Z"
+        type: string
+      total_duration:
         example: 1h30m
         type: string
+      total_exercise_time:
+        example: 1h
+        type: string
+      total_rest_time:
+        example: 30m
+        type: string
     required:
-    - id
-    - planned
+    - planned_date
     type: object
 info:
   contact: {}

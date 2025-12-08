@@ -1,11 +1,13 @@
 package httpin
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/EnduranNSU/trainings/internal/adapter/in/http/dto"
 	svctraining "github.com/EnduranNSU/trainings/internal/domain"
@@ -108,39 +110,78 @@ func (h *TrainingHandler) CreateTraining(c *gin.Context) {
 		return
 	}
 
-	planned, err := time.Parse(time.RFC3339, req.Planned)
+	plannedDate, err := time.Parse(time.RFC3339, req.PlannedDate)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid planned time format"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid planned_date time format"})
 		return
 	}
 
-	var done *time.Time
-	if req.Done != nil {
-		doneTime, err := time.Parse(time.RFC3339, *req.Done)
+	var actualDate, startedAt, finishedAt *time.Time
+	var totalDuration, totalRestTime, totalExerciseTime *time.Duration
+
+	// Parse optional time fields
+	if req.ActualDate != nil {
+		t, err := time.Parse(time.RFC3339, *req.ActualDate)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid done time format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid actual_date time format"})
 			return
 		}
-		done = &doneTime
+		actualDate = &t
+	}
+	if req.StartedAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.StartedAt)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid started_at time format"})
+			return
+		}
+		startedAt = &t
+	}
+	if req.FinishedAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.FinishedAt)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid finished_at time format"})
+			return
+		}
+		finishedAt = &t
 	}
 
-	var totalTime *time.Duration
-	if req.TotalTime != nil {
-		duration, err := time.ParseDuration(*req.TotalTime)
+	// Parse optional duration fields
+	if req.TotalDuration != nil {
+		duration, err := time.ParseDuration(*req.TotalDuration)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_time format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_duration format"})
 			return
 		}
-		totalTime = &duration
+		totalDuration = &duration
+	}
+	if req.TotalRestTime != nil {
+		duration, err := time.ParseDuration(*req.TotalRestTime)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_rest_time format"})
+			return
+		}
+		totalRestTime = &duration
+	}
+	if req.TotalExerciseTime != nil {
+		duration, err := time.ParseDuration(*req.TotalExerciseTime)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_exercise_time format"})
+			return
+		}
+		totalExerciseTime = &duration
 	}
 
 	cmd := svctraining.CreateTrainingCmd{
-		UserID:    uid,
-		IsDone:    req.IsDone,
-		Planned:   planned,
-		Done:      done,
-		TotalTime: totalTime,
-		Rating:    req.Rating,
+		UserID:            uid,
+		IsDone:            req.IsDone,
+		PlannedDate:       plannedDate,
+		ActualDate:        actualDate,
+		StartedAt:         startedAt,
+		FinishedAt:        finishedAt,
+		TotalDuration:     totalDuration,
+		TotalRestTime:     totalRestTime,
+		TotalExerciseTime: totalExerciseTime,
+		Rating:            req.Rating,
 	}
 
 	training, err := h.svc.CreateTraining(c.Request.Context(), cmd)
@@ -178,39 +219,76 @@ func (h *TrainingHandler) UpdateTraining(c *gin.Context) {
 		return
 	}
 
-	planned, err := time.Parse(time.RFC3339, req.Planned)
+	plannedDate, err := time.Parse(time.RFC3339, req.PlannedDate)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid planned time format"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid planned_date time format"})
 		return
 	}
 
-	var done *time.Time
-	if req.Done != nil {
-		doneTime, err := time.Parse(time.RFC3339, *req.Done)
+	var actualDate, startedAt, finishedAt *time.Time
+	var totalDuration, totalRestTime, totalExerciseTime *time.Duration
+
+	if req.ActualDate != nil {
+		t, err := time.Parse(time.RFC3339, *req.ActualDate)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid done time format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid actual_date time format"})
 			return
 		}
-		done = &doneTime
+		actualDate = &t
+	}
+	if req.StartedAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.StartedAt)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid started_at time format"})
+			return
+		}
+		startedAt = &t
+	}
+	if req.FinishedAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.FinishedAt)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid finished_at time format"})
+			return
+		}
+		finishedAt = &t
 	}
 
-	var totalTime *time.Duration
-	if req.TotalTime != nil {
-		duration, err := time.ParseDuration(*req.TotalTime)
+	if req.TotalDuration != nil {
+		duration, err := time.ParseDuration(*req.TotalDuration)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_time format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_duration format"})
 			return
 		}
-		totalTime = &duration
+		totalDuration = &duration
+	}
+	if req.TotalRestTime != nil {
+		duration, err := time.ParseDuration(*req.TotalRestTime)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_rest_time format"})
+			return
+		}
+		totalRestTime = &duration
+	}
+	if req.TotalExerciseTime != nil {
+		duration, err := time.ParseDuration(*req.TotalExerciseTime)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid total_exercise_time format"})
+			return
+		}
+		totalExerciseTime = &duration
 	}
 
 	cmd := svctraining.UpdateTrainingCmd{
-		ID:        trainingID,
-		IsDone:    req.IsDone,
-		Planned:   planned,
-		Done:      done,
-		TotalTime: totalTime,
-		Rating:    req.Rating,
+		ID:                trainingID,
+		IsDone:            req.IsDone,
+		PlannedDate:       plannedDate,
+		ActualDate:        actualDate,
+		StartedAt:         startedAt,
+		FinishedAt:        finishedAt,
+		TotalDuration:     totalDuration,
+		TotalRestTime:     totalRestTime,
+		TotalExerciseTime: totalExerciseTime,
+		Rating:            req.Rating,
 	}
 
 	training, err := h.svc.UpdateTraining(c.Request.Context(), cmd)
@@ -268,23 +346,58 @@ func (h *TrainingHandler) AddExerciseToTraining(c *gin.Context) {
 		return
 	}
 
-	var exerciseTime *time.Time
+	var weight *decimal.Decimal
+	if req.Weight != nil {
+		w := decimal.NewFromFloat(*req.Weight)
+		weight = &w
+	}
+
+	var timeVal, doing, rest *time.Duration
 	if req.Time != nil {
-		timeVal, err := time.Parse(time.RFC3339, *req.Time)
+		duration, err := time.ParseDuration(*req.Time)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid time format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid time format, use duration format like '1h30m'"})
 			return
 		}
-		exerciseTime = &timeVal
+		timeVal = &duration
+	}
+	if req.Doing != nil {
+		duration, err := time.ParseDuration(*req.Doing)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid doing format, use duration format like '1h30m'"})
+			return
+		}
+		doing = &duration
+	}
+	if req.Rest != nil {
+		duration, err := time.ParseDuration(*req.Rest)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid rest format, use duration format like '1h30m'"})
+			return
+		}
+		rest = &duration
+	}
+
+	// Convert approaches and reps from *int64 to *int32
+	var approaches, reps *int32
+	if req.Approaches != nil {
+		a := int32(*req.Approaches)
+		approaches = &a
+	}
+	if req.Reps != nil {
+		r := int32(*req.Reps)
+		reps = &r
 	}
 
 	cmd := svctraining.AddExerciseToTrainingCmd{
 		TrainingID: req.TrainingID,
 		ExerciseID: req.ExerciseID,
-		Weight:     req.Weight,
-		Approaches: req.Approaches,
-		Reps:       req.Reps,
-		Time:       exerciseTime,
+		Weight:     weight,
+		Approaches: approaches,
+		Reps:       reps,
+		Time:       timeVal,
+		Doing:      doing,
+		Rest:       rest,
 		Notes:      req.Notes,
 	}
 
@@ -323,22 +436,57 @@ func (h *TrainingHandler) UpdateTrainedExercise(c *gin.Context) {
 		return
 	}
 
-	var exerciseTime *time.Time
+	var weight *decimal.Decimal
+	if req.Weight != nil {
+		w := decimal.NewFromFloat(*req.Weight)
+		weight = &w
+	}
+
+	var timeVal, doing, rest *time.Duration
 	if req.Time != nil {
-		timeVal, err := time.Parse(time.RFC3339, *req.Time)
+		duration, err := time.ParseDuration(*req.Time)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid time format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid time format, use duration format like '1h30m'"})
 			return
 		}
-		exerciseTime = &timeVal
+		timeVal = &duration
+	}
+	if req.Doing != nil {
+		duration, err := time.ParseDuration(*req.Doing)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid doing format, use duration format like '1h30m'"})
+			return
+		}
+		doing = &duration
+	}
+	if req.Rest != nil {
+		duration, err := time.ParseDuration(*req.Rest)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid rest format, use duration format like '1h30m'"})
+			return
+		}
+		rest = &duration
+	}
+
+	// Convert approaches and reps from *int64 to *int32
+	var approaches, reps *int32
+	if req.Approaches != nil {
+		a := int32(*req.Approaches)
+		approaches = &a
+	}
+	if req.Reps != nil {
+		r := int32(*req.Reps)
+		reps = &r
 	}
 
 	cmd := svctraining.UpdateTrainedExerciseCmd{
 		ID:         exerciseID,
-		Weight:     req.Weight,
-		Approaches: req.Approaches,
-		Reps:       req.Reps,
-		Time:       exerciseTime,
+		Weight:     weight,
+		Approaches: approaches,
+		Reps:       reps,
+		Time:       timeVal,
+		Doing:      doing,
+		Rest:       rest,
 		Notes:      req.Notes,
 	}
 
@@ -410,14 +558,11 @@ func (h *TrainingHandler) GetUserTrainingStats(c *gin.Context) {
 		return
 	}
 
-	var lastTrainingDate *string
-
 	resp := dto.TrainingStatsResponse{
 		TotalTrainings:     stats.TotalTrainings,
 		CompletedTrainings: stats.CompletedTrainings,
 		AverageRating:      stats.AverageRating,
 		TotalDuration:      stats.TotalTime,
-		LastTrainingDate:   lastTrainingDate,
 	}
 
 	c.JSON(http.StatusOK, resp)
@@ -461,16 +606,32 @@ func (h *TrainingHandler) CompleteTraining(c *gin.Context) {
 // Вспомогательные методы
 
 func (h *TrainingHandler) trainingToResponse(training *svctraining.Training) dto.TrainingResponse {
-	var done *string
-	if training.Done != nil {
-		doneStr := training.Done.Format(time.RFC3339)
-		done = &doneStr
+	var actualDate, startedAt, finishedAt *string
+	if training.ActualDate != nil {
+		s := training.ActualDate.Format(time.RFC3339)
+		actualDate = &s
+	}
+	if training.StartedAt != nil {
+		s := training.StartedAt.Format(time.RFC3339)
+		startedAt = &s
+	}
+	if training.FinishedAt != nil {
+		s := training.FinishedAt.Format(time.RFC3339)
+		finishedAt = &s
 	}
 
-	var totalTime *string
-	if training.TotalTime != nil {
-		durationStr := training.TotalTime.String()
-		totalTime = &durationStr
+	var totalDuration, totalRestTime, totalExerciseTime *string
+	if training.TotalDuration != nil {
+		s := formatDuration(*training.TotalDuration)
+		totalDuration = &s
+	}
+	if training.TotalRestTime != nil {
+		s := formatDuration(*training.TotalRestTime)
+		totalRestTime = &s
+	}
+	if training.TotalExerciseTime != nil {
+		s := formatDuration(*training.TotalExerciseTime)
+		totalExerciseTime = &s
 	}
 
 	var exercises []dto.TrainedExerciseResponse
@@ -481,34 +642,67 @@ func (h *TrainingHandler) trainingToResponse(training *svctraining.Training) dto
 		}
 	}
 
-
 	return dto.TrainingResponse{
-		ID:        training.ID,
-		UserID:    training.UserID.String(),
-		IsDone:    training.IsDone,
-		Planned:   training.Planned.Format(time.RFC3339),
-		Done:      done,
-		TotalTime: totalTime,
-		Rating:    training.Rating,
-		Exercises: exercises,
+		ID:                training.ID,
+		UserID:            training.UserID.String(),
+		IsDone:            training.IsDone,
+		PlannedDate:       training.PlannedDate.Format(time.RFC3339),
+		ActualDate:        actualDate,
+		StartedAt:         startedAt,
+		FinishedAt:        finishedAt,
+		TotalDuration:     totalDuration,
+		TotalRestTime:     totalRestTime,
+		TotalExerciseTime: totalExerciseTime,
+		Rating:            training.Rating,
+		Exercises:         exercises,
 	}
 }
 
 func (h *TrainingHandler) trainedExerciseToResponse(exercise *svctraining.TrainedExercise) dto.TrainedExerciseResponse {
-	var timeStr *string
+	var weight *float64
+	if exercise.Weight != nil {
+		f, _ := exercise.Weight.Float64()
+		weight = &f
+	}
+
+	var timeStr, doingStr, restStr *string
 	if exercise.Time != nil {
-		timeVal := exercise.Time.Format(time.RFC3339)
-		timeStr = &timeVal
+		s := formatDuration(*exercise.Time)
+		timeStr = &s
+	}
+	if exercise.Doing != nil {
+		s := formatDuration(*exercise.Doing)
+		doingStr = &s
+	}
+	if exercise.Rest != nil {
+		s := formatDuration(*exercise.Rest)
+		restStr = &s
 	}
 
 	return dto.TrainedExerciseResponse{
 		ID:         exercise.ID,
 		TrainingID: exercise.TrainingID,
 		ExerciseID: exercise.ExerciseID,
-		Weight:     exercise.Weight,
+		Weight:     weight,
 		Approaches: exercise.Approaches,
 		Reps:       exercise.Reps,
 		Time:       timeStr,
+		Doing:      doingStr,
+		Rest:       restStr,
 		Notes:      exercise.Notes,
 	}
+}
+
+func formatDuration(d time.Duration) string {
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+
+	if hours > 0 {
+		return fmt.Sprintf("%dh%dm%ds", hours, minutes, seconds)
+	}
+	if minutes > 0 {
+		return fmt.Sprintf("%dm%ds", minutes, seconds)
+	}
+	return fmt.Sprintf("%ds", seconds)
 }

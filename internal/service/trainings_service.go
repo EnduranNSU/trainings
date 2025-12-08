@@ -22,6 +22,14 @@ type trainingService struct {
 	repo domain.TrainingRepository
 }
 
+func (s *trainingService) GetUserTrainingStats(ctx context.Context, userID uuid.UUID) (*domain.TrainingStats, error) {
+	if userID == uuid.Nil {
+		return nil, errors.New("invalid user id")
+	}
+
+	return s.repo.GetUserTrainingStats(ctx, userID)
+}
+
 func (s *trainingService) GetTrainingsByUser(ctx context.Context, userID uuid.UUID) ([]*domain.Training, error) {
 	if userID == uuid.Nil {
 		return nil, errors.New("invalid user id")
@@ -43,27 +51,21 @@ func (s *trainingService) CreateTraining(ctx context.Context, cmd domain.CreateT
 		return nil, errors.New("invalid user id")
 	}
 
-	if cmd.Planned.IsZero() {
+	if cmd.PlannedDate.IsZero() {
 		return nil, errors.New("planned date is required")
 	}
 
-	// Если тренировка создается как выполненная, но не указана дата выполнения,
-	// устанавливаем текущее время
-	var done *time.Time
-	if cmd.IsDone && cmd.Done == nil {
-		now := time.Now().UTC()
-		done = &now
-	} else {
-		done = cmd.Done
-	}
-
 	training := &domain.Training{
-		UserID:    cmd.UserID,
-		IsDone:    cmd.IsDone,
-		Planned:   cmd.Planned,
-		Done:      done,
-		TotalTime: cmd.TotalTime,
-		Rating:    cmd.Rating,
+		UserID:            cmd.UserID,
+		IsDone:            cmd.IsDone,
+		PlannedDate:       cmd.PlannedDate,
+		ActualDate:        cmd.ActualDate,
+		StartedAt:         cmd.StartedAt,
+		FinishedAt:        cmd.FinishedAt,
+		TotalDuration:     cmd.TotalDuration,
+		TotalRestTime:     cmd.TotalRestTime,
+		TotalExerciseTime: cmd.TotalExerciseTime,
+		Rating:            cmd.Rating,
 	}
 
 	return s.repo.CreateTraining(ctx, training)
@@ -84,14 +86,26 @@ func (s *trainingService) UpdateTraining(ctx context.Context, cmd domain.UpdateT
 	if cmd.IsDone != nil {
 		existing.IsDone = *cmd.IsDone
 	}
-	if !cmd.Planned.IsZero() {
-		existing.Planned = cmd.Planned
+	if !cmd.PlannedDate.IsZero() {
+		existing.PlannedDate = cmd.PlannedDate
 	}
-	if cmd.Done != nil {
-		existing.Done = cmd.Done
+	if cmd.ActualDate != nil {
+		existing.ActualDate = cmd.ActualDate
 	}
-	if cmd.TotalTime != nil {
-		existing.TotalTime = cmd.TotalTime
+	if cmd.StartedAt != nil {
+		existing.StartedAt = cmd.StartedAt
+	}
+	if cmd.FinishedAt != nil {
+		existing.FinishedAt = cmd.FinishedAt
+	}
+	if cmd.TotalDuration != nil {
+		existing.TotalDuration = cmd.TotalDuration
+	}
+	if cmd.TotalRestTime != nil {
+		existing.TotalRestTime = cmd.TotalRestTime
+	}
+	if cmd.TotalExerciseTime != nil {
+		existing.TotalExerciseTime = cmd.TotalExerciseTime
 	}
 	if cmd.Rating != nil {
 		existing.Rating = cmd.Rating
@@ -129,6 +143,8 @@ func (s *trainingService) AddExerciseToTraining(ctx context.Context, cmd domain.
 		Approaches: cmd.Approaches,
 		Reps:       cmd.Reps,
 		Time:       cmd.Time,
+		Doing:      cmd.Doing,
+		Rest:       cmd.Rest,
 		Notes:      cmd.Notes,
 	}
 
@@ -140,15 +156,14 @@ func (s *trainingService) UpdateTrainedExercise(ctx context.Context, cmd domain.
 		return nil, ErrInvalidExerciseID
 	}
 
-	// Для обновления нам нужен существующий объект упражнения
-	// В реальном приложении здесь нужно получить упражнение по ID
-	// Для простоты создаем новый объект с переданными данными
 	exercise := &domain.TrainedExercise{
 		ID:         cmd.ID,
 		Weight:     cmd.Weight,
 		Approaches: cmd.Approaches,
 		Reps:       cmd.Reps,
 		Time:       cmd.Time,
+		Doing:      cmd.Doing,
+		Rest:       cmd.Rest,
 		Notes:      cmd.Notes,
 	}
 
@@ -166,12 +181,24 @@ func (s *trainingService) RemoveExerciseFromTraining(ctx context.Context, traini
 	return s.repo.DeleteExerciseFromTraining(ctx, exerciseID, trainingID)
 }
 
-func (s *trainingService) GetUserTrainingStats(ctx context.Context, userID uuid.UUID) (*domain.TrainingStats, error) {
-	if userID == uuid.Nil {
-		return nil, errors.New("invalid user id")
+func (s *trainingService) StartTraining(ctx context.Context, trainingID int64) (*domain.Training, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
 	}
 
-	return s.repo.GetUserTrainingStats(ctx, userID)
+	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	if training.StartedAt != nil {
+		return training, nil // Уже начата
+	}
+
+	now := time.Now().UTC()
+	training.StartedAt = &now
+
+	return s.repo.UpdateTraining(ctx, training)
 }
 
 func (s *trainingService) CompleteTraining(ctx context.Context, trainingID int64, rating *int32) (*domain.Training, error) {
@@ -179,17 +206,22 @@ func (s *trainingService) CompleteTraining(ctx context.Context, trainingID int64
 		return nil, ErrInvalidTrainingID
 	}
 
-	// Получаем текущую тренировку
 	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
 	if err != nil {
 		return nil, ErrTrainingNotFound
 	}
 
-	// Помечаем как выполненную
 	training.IsDone = true
 	now := time.Now().UTC()
-	training.Done = &now
+	training.ActualDate = &now
+	training.FinishedAt = &now
 	training.Rating = rating
+
+	// Если не было начато, устанавливаем время начала как текущее минус предполагаемая длительность
+	if training.StartedAt == nil {
+		startedAt := now.Add(-*training.TotalDuration)
+		training.StartedAt = &startedAt
+	}
 
 	return s.repo.UpdateTraining(ctx, training)
 }

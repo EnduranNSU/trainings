@@ -3,11 +3,11 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/EnduranNSU/trainings/internal/adapter/out/postgres/gen"
 	"github.com/EnduranNSU/trainings/internal/domain"
 	"github.com/EnduranNSU/trainings/internal/logging"
+	"github.com/shopspring/decimal"
 
 	"github.com/google/uuid"
 	"github.com/guregu/null/v6"
@@ -41,7 +41,7 @@ func (r *TrainingRepositoryImpl) GetTrainingsByUser(ctx context.Context, userID 
 	}
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"user_id":       userID.String(),
+		"user_id":         userID.String(),
 		"trainings_count": len(result),
 	})
 	logging.Debug("GetTrainingsByUser", jsonData, "successfully retrieved user trainings")
@@ -62,7 +62,7 @@ func (r *TrainingRepositoryImpl) GetTrainingWithExercises(ctx context.Context, t
 	domainTraining := r.toDomainTrainingFromJoined(training)
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"training_id":   trainingID,
+		"training_id":     trainingID,
 		"exercises_count": len(domainTraining.Exercises),
 	})
 	logging.Debug("GetTrainingWithExercises", jsonData, "successfully retrieved training with exercises")
@@ -72,19 +72,23 @@ func (r *TrainingRepositoryImpl) GetTrainingWithExercises(ctx context.Context, t
 
 func (r *TrainingRepositoryImpl) CreateTraining(ctx context.Context, training *domain.Training) (*domain.Training, error) {
 	params := gen.CreateTrainingParams{
-		UserID:    training.UserID,
-		Isdone:    training.IsDone,
-		Planned:   training.Planned,
-		Done:      null.TimeFromPtr(training.Done).NullTime,
-		TotalTime: null.IntFromPtr((*int64)(training.TotalTime)).NullInt64,
-		Rating:    null.Int32FromPtr(training.Rating).NullInt32,
+		UserID:            training.UserID,
+		IsDone:            training.IsDone,
+		PlannedDate:       training.PlannedDate,
+		ActualDate:        null.TimeFromPtr(training.ActualDate).NullTime,
+		StartedAt:         null.TimeFromPtr(training.StartedAt).NullTime,
+		FinishedAt:        null.TimeFromPtr(training.FinishedAt).NullTime,
+		TotalDuration:     durationToNullInt64(training.TotalDuration),
+		TotalRestTime:     durationToNullInt64(training.TotalRestTime),
+		TotalExerciseTime: durationToNullInt64(training.TotalExerciseTime),
+		Rating:            null.Int32FromPtr(training.Rating).NullInt32,
 	}
 
 	created, err := r.q.CreateTraining(ctx, params)
 	if err != nil {
 		jsonData := logging.MarshalLogData(map[string]interface{}{
 			"user_id": training.UserID.String(),
-			"planned": training.Planned,
+			"planned": training.PlannedDate,
 			"is_done": training.IsDone,
 		})
 		logging.Error(err, "CreateTraining", jsonData, "failed to create training")
@@ -104,12 +108,16 @@ func (r *TrainingRepositoryImpl) CreateTraining(ctx context.Context, training *d
 
 func (r *TrainingRepositoryImpl) UpdateTraining(ctx context.Context, training *domain.Training) (*domain.Training, error) {
 	params := gen.UpdateTrainingParams{
-		Isdone:    training.IsDone,
-		Planned:   training.Planned,
-		Done:      null.TimeFromPtr(training.Done).NullTime,
-		TotalTime: null.IntFromPtr((*int64)(training.TotalTime)).NullInt64,
-		Rating:    null.Int32FromPtr(training.Rating).NullInt32,
-		ID:        training.ID,
+		IsDone:            training.IsDone,
+		PlannedDate:       training.PlannedDate,
+		ActualDate:        null.TimeFromPtr(training.ActualDate).NullTime,
+		StartedAt:         null.TimeFromPtr(training.StartedAt).NullTime,
+		FinishedAt:        null.TimeFromPtr(training.FinishedAt).NullTime,
+		TotalDuration:     durationToNullInt64(training.TotalDuration),
+		TotalRestTime:     durationToNullInt64(training.TotalRestTime),
+		TotalExerciseTime: durationToNullInt64(training.TotalExerciseTime),
+		Rating:            null.Int32FromPtr(training.Rating).NullInt32,
+		ID:                training.ID,
 	}
 
 	updated, err := r.q.UpdateTraining(ctx, params)
@@ -152,16 +160,18 @@ func (r *TrainingRepositoryImpl) DeleteTrainingAndExercises(ctx context.Context,
 }
 
 func (r *TrainingRepositoryImpl) AddExerciseToTraining(ctx context.Context, exercise *domain.TrainedExercise) (*domain.TrainedExercise, error) {
+	weight := exercise.Weight.String()
 	params := gen.AddExerciseToTrainingParams{
 		TrainingID: exercise.TrainingID,
 		ExerciseID: exercise.ExerciseID,
-		Weight:     null.FloatFromPtr(exercise.Weight).NullFloat64,
-		Approaches: null.IntFromPtr(exercise.Approaches).NullInt64,
-		Reps:       null.IntFromPtr(exercise.Reps).NullInt64,
-		Time:       null.TimeFromPtr(exercise.Time).NullTime,
+		Weight:     null.StringFromPtr(&weight).NullString,
+		Approaches: null.Int32FromPtr(exercise.Approaches).NullInt32,
+		Reps:       null.Int32FromPtr(exercise.Reps).NullInt32,
+		Time:       durationToNullInt64(exercise.Time),
+		Doing:      durationToNullInt64(exercise.Doing),
+		Rest:       durationToNullInt64(exercise.Rest),
 		Notes:      null.StringFromPtr(exercise.Notes).NullString,
 	}
-
 	created, err := r.q.AddExerciseToTraining(ctx, params)
 	if err != nil {
 		jsonData := logging.MarshalLogData(map[string]interface{}{
@@ -185,11 +195,14 @@ func (r *TrainingRepositoryImpl) AddExerciseToTraining(ctx context.Context, exer
 }
 
 func (r *TrainingRepositoryImpl) UpdateTrainedExercise(ctx context.Context, exercise *domain.TrainedExercise) (*domain.TrainedExercise, error) {
+	weight := exercise.Weight.String()
 	params := gen.UpdateTrainedExerciseParams{
-		Weight:     null.FloatFromPtr(exercise.Weight).NullFloat64,
-		Approaches: null.IntFromPtr(exercise.Approaches).NullInt64,
-		Reps:       null.IntFromPtr(exercise.Reps).NullInt64,
-		Time:       null.TimeFromPtr(exercise.Time).NullTime,
+		Weight:     null.StringFromPtr(&weight).NullString,
+		Approaches: null.Int32FromPtr(exercise.Approaches).NullInt32,
+		Reps:       null.Int32FromPtr(exercise.Reps).NullInt32,
+		Time:       durationToNullInt64(exercise.Time),
+		Doing:      durationToNullInt64(exercise.Doing),
+		Rest:       durationToNullInt64(exercise.Rest),
 		Notes:      null.StringFromPtr(exercise.Notes).NullString,
 		ID:         exercise.ID,
 	}
@@ -267,10 +280,10 @@ func (r *TrainingRepositoryImpl) GetUserTrainingStats(ctx context.Context, userI
 	}
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"user_id":            userID.String(),
-		"total_trainings":    stats.TotalTrainings,
+		"user_id":             userID.String(),
+		"total_trainings":     stats.TotalTrainings,
 		"completed_trainings": stats.CompletedTrainings,
-		"average_rating":     stats.AverageRating,
+		"average_rating":      stats.AverageRating,
 	})
 	logging.Debug("GetUserTrainingStats", jsonData, "successfully calculated user training stats")
 
@@ -280,28 +293,35 @@ func (r *TrainingRepositoryImpl) GetUserTrainingStats(ctx context.Context, userI
 // Вспомогательные методы для преобразования данных (остаются без изменений)
 func (r *TrainingRepositoryImpl) toDomainTraining(t gen.GetTrainingsByUserRow) *domain.Training {
 	training := &domain.Training{
-		ID:        t.ID,
-		UserID:    t.UserID,
-		IsDone:    t.Isdone,
-		Planned:   t.Planned,
-		Done:      nullTimeFromSQL(t.Done),
-		TotalTime: (*time.Duration)(nullIntFromSQL(t.TotalTime)),
-		Rating:    nullIntFromSQL32(t.Rating),
+		ID:                t.ID,
+		UserID:            t.UserID,
+		IsDone:            t.IsDone,
+		PlannedDate:       t.PlannedDate,
+		ActualDate:        nullTimeFromSQL(t.ActualDate),
+		StartedAt:         nullTimeFromSQL(t.StartedAt),
+		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
+		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
+		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
+		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
+		Rating:            nullIntFromSQL32(t.Rating),
 	}
 
 	// Преобразование упражнений
 	if t.Exercises != nil {
-		if exercisesSlice, ok := t.Exercises.([]gen.TrainedExercise); ok && len(exercisesSlice) > 0 {
+		if exercisesSlice, ok := t.Exercises.([]gen.TrainedExercise); ok {
 			exercises := make([]domain.TrainedExercise, len(exercisesSlice))
 			for i, ex := range exercisesSlice {
+				weight, _ := decimal.NewFromString(ex.Weight.String)
 				exercises[i] = domain.TrainedExercise{
 					ID:         ex.ID,
 					TrainingID: training.ID,
 					ExerciseID: ex.ExerciseID,
-					Weight:     nullFloatFromSQL(ex.Weight),
-					Approaches: nullIntFromSQL(ex.Approaches),
-					Reps:       nullIntFromSQL(ex.Reps),
-					Time:       nullTimeFromSQL(ex.Time),
+					Weight:     &weight,
+					Approaches: nullIntFromSQL32(ex.Approaches),
+					Reps:       nullIntFromSQL32(ex.Reps),
+					Time:       sqlNullInt64ToDuration(ex.Time),
+					Doing:      sqlNullInt64ToDuration(ex.Doing),
+					Rest:       sqlNullInt64ToDuration(ex.Rest),
 					Notes:      nullStringFromSQL(ex.Notes),
 				}
 			}
@@ -314,28 +334,35 @@ func (r *TrainingRepositoryImpl) toDomainTraining(t gen.GetTrainingsByUserRow) *
 
 func (r *TrainingRepositoryImpl) toDomainTrainingFromJoined(t gen.GetTrainingWithExercisesRow) *domain.Training {
 	training := &domain.Training{
-		ID:        t.ID,
-		UserID:    t.UserID,
-		IsDone:    t.Isdone,
-		Planned:   t.Planned,
-		Done:      nullTimeFromSQL(t.Done),
-		TotalTime: (*time.Duration)(nullIntFromSQL(t.TotalTime)),
-		Rating:    nullIntFromSQL32(t.Rating),
+		ID:                t.ID,
+		UserID:            t.UserID,
+		IsDone:            t.IsDone,
+		PlannedDate:       t.PlannedDate,
+		ActualDate:        nullTimeFromSQL(t.ActualDate),
+		StartedAt:         nullTimeFromSQL(t.StartedAt),
+		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
+		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
+		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
+		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
+		Rating:            nullIntFromSQL32(t.Rating),
 	}
 
 	// Преобразование упражнений
 	if t.Exercises != nil {
-		if exercisesSlice, ok := t.Exercises.([]gen.TrainedExercise); ok && len(exercisesSlice) > 0 {
+		if exercisesSlice, ok := t.Exercises.([]gen.TrainedExercise); ok {
 			exercises := make([]domain.TrainedExercise, len(exercisesSlice))
 			for i, ex := range exercisesSlice {
+				weight, _ := decimal.NewFromString(ex.Weight.String)
 				exercises[i] = domain.TrainedExercise{
 					ID:         ex.ID,
 					TrainingID: training.ID,
 					ExerciseID: ex.ExerciseID,
-					Weight:     nullFloatFromSQL(ex.Weight),
-					Approaches: nullIntFromSQL(ex.Approaches),
-					Reps:       nullIntFromSQL(ex.Reps),
-					Time:       nullTimeFromSQL(ex.Time),
+					Weight:     &weight,
+					Approaches: nullIntFromSQL32(ex.Approaches),
+					Reps:       nullIntFromSQL32(ex.Reps),
+					Time:       sqlNullInt64ToDuration(ex.Time),
+					Doing:      sqlNullInt64ToDuration(ex.Doing),
+					Rest:       sqlNullInt64ToDuration(ex.Rest),
 					Notes:      nullStringFromSQL(ex.Notes),
 				}
 			}
@@ -348,25 +375,32 @@ func (r *TrainingRepositoryImpl) toDomainTrainingFromJoined(t gen.GetTrainingWit
 
 func (r *TrainingRepositoryImpl) toDomainTrainingFromGen(t gen.Training) *domain.Training {
 	return &domain.Training{
-		ID:        t.ID,
-		UserID:    t.UserID,
-		IsDone:    t.Isdone,
-		Planned:   t.Planned,
-		Done:      nullTimeFromSQL(t.Done),
-		TotalTime: (*time.Duration)(nullIntFromSQL(t.TotalTime)),
-		Rating:    nullIntFromSQL32(t.Rating),
+		ID:                t.ID,
+		UserID:            t.UserID,
+		IsDone:            t.IsDone,
+		PlannedDate:       t.PlannedDate,
+		ActualDate:        nullTimeFromSQL(t.ActualDate),
+		StartedAt:         nullTimeFromSQL(t.StartedAt),
+		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
+		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
+		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
+		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
+		Rating:            nullIntFromSQL32(t.Rating),
 	}
 }
 
-func (r *TrainingRepositoryImpl) toDomainTrainedExercise(t gen.TrainedExercise) *domain.TrainedExercise {
+func (r *TrainingRepositoryImpl) toDomainTrainedExercise(ex gen.TrainedExercise) *domain.TrainedExercise {
+	weight, _ := decimal.NewFromString(ex.Weight.String)
 	return &domain.TrainedExercise{
-		ID:         t.ID,
-		TrainingID: t.TrainingID,
-		ExerciseID: t.ExerciseID,
-		Weight:     nullFloatFromSQL(t.Weight),
-		Approaches: nullIntFromSQL(t.Approaches),
-		Reps:       nullIntFromSQL(t.Reps),
-		Time:       nullTimeFromSQL(t.Time),
-		Notes:      nullStringFromSQL(t.Notes),
+		ID:         ex.ID,
+		TrainingID: ex.TrainingID,
+		ExerciseID: ex.ExerciseID,
+		Weight:     &weight,
+		Approaches: nullIntFromSQL32(ex.Approaches),
+		Reps:       nullIntFromSQL32(ex.Reps),
+		Time:       sqlNullInt64ToDuration(ex.Time),
+		Doing:      sqlNullInt64ToDuration(ex.Doing),
+		Rest:       sqlNullInt64ToDuration(ex.Rest),
+		Notes:      nullStringFromSQL(ex.Notes),
 	}
 }

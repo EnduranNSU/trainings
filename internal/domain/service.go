@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 type TrainingService interface {
@@ -21,42 +22,53 @@ type TrainingService interface {
 }
 
 type CreateTrainingCmd struct {
-	UserID    uuid.UUID
-	IsDone    bool
-	Planned   time.Time
-	Done      *time.Time
-	TotalTime *time.Duration
-	Rating    *int32
+	UserID            uuid.UUID
+	IsDone            bool
+	PlannedDate       time.Time
+	ActualDate        *time.Time
+	StartedAt         *time.Time
+	FinishedAt        *time.Time
+	TotalDuration     *time.Duration
+	TotalRestTime     *time.Duration
+	TotalExerciseTime *time.Duration
+	Rating            *int32
 }
 
 type UpdateTrainingCmd struct {
-	ID        int64
-	IsDone    *bool
-	Planned   time.Time
-	Done      *time.Time
-	TotalTime *time.Duration
-	Rating    *int32
+	ID                int64
+	IsDone            *bool
+	PlannedDate       time.Time
+	ActualDate        *time.Time
+	StartedAt         *time.Time
+	FinishedAt        *time.Time
+	TotalDuration     *time.Duration
+	TotalRestTime     *time.Duration
+	TotalExerciseTime *time.Duration
+	Rating            *int32
 }
 
 type AddExerciseToTrainingCmd struct {
 	TrainingID int64
 	ExerciseID int64
-	Weight     *float64
-	Approaches *int64
-	Reps       *int64
-	Time       *time.Time
+	Weight     *decimal.Decimal
+	Approaches *int32
+	Reps       *int32
+	Time       *time.Duration
+	Doing      *time.Duration
+	Rest       *time.Duration
 	Notes      *string
 }
 
 type UpdateTrainedExerciseCmd struct {
 	ID         int64
-	Weight     *float64
-	Approaches *int64
-	Reps       *int64
-	Time       *time.Time
+	Weight     *decimal.Decimal
+	Approaches *int32
+	Reps       *int32
+	Time       *time.Duration
+	Doing      *time.Duration
+	Rest       *time.Duration
 	Notes      *string
 }
-
 
 type ExerciseService interface {
 	GetAllExercises(ctx context.Context) ([]*Exercise, error)

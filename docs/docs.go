@@ -945,6 +945,10 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 3
                 },
+                "doing": {
+                    "type": "string",
+                    "example": "1h"
+                },
                 "exercise_id": {
                     "type": "integer",
                     "minimum": 1,
@@ -960,9 +964,13 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 10
                 },
+                "rest": {
+                    "type": "string",
+                    "example": "30m"
+                },
                 "time": {
                     "type": "string",
-                    "example": "2023-10-05T15:30:00Z"
+                    "example": "1h30m"
                 },
                 "training_id": {
                     "type": "integer",
@@ -991,11 +999,15 @@ const docTemplate = `{
         "github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.CreateTrainingRequest": {
             "type": "object",
             "required": [
-                "planned",
+                "planned_date",
                 "user_id"
             ],
             "properties": {
-                "done": {
+                "actual_date": {
+                    "type": "string",
+                    "example": "2023-10-05T16:30:00Z"
+                },
+                "finished_at": {
                     "type": "string",
                     "example": "2023-10-05T16:30:00Z"
                 },
@@ -1003,7 +1015,7 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": false
                 },
-                "planned": {
+                "planned_date": {
                     "type": "string",
                     "example": "2023-10-05T15:00:00Z"
                 },
@@ -1013,9 +1025,21 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 5
                 },
-                "total_time": {
+                "started_at": {
+                    "type": "string",
+                    "example": "2023-10-05T15:00:00Z"
+                },
+                "total_duration": {
                     "type": "string",
                     "example": "1h30m"
+                },
+                "total_exercise_time": {
+                    "type": "string",
+                    "example": "1h"
+                },
+                "total_rest_time": {
+                    "type": "string",
+                    "example": "30m"
                 },
                 "user_id": {
                     "type": "string",
@@ -1079,6 +1103,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 3
                 },
+                "doing": {
+                    "type": "string",
+                    "example": "1h"
+                },
                 "exercise_id": {
                     "type": "integer",
                     "example": 1
@@ -1095,9 +1123,13 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 10
                 },
+                "rest": {
+                    "type": "string",
+                    "example": "30m"
+                },
                 "time": {
                     "type": "string",
-                    "example": "2023-10-05T15:30:00Z"
+                    "example": "1h30m"
                 },
                 "training_id": {
                     "type": "integer",
@@ -1112,7 +1144,7 @@ const docTemplate = `{
         "github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.TrainingResponse": {
             "type": "object",
             "properties": {
-                "done": {
+                "actual_date": {
                     "type": "string",
                     "example": "2023-10-05T16:30:00Z"
                 },
@@ -1122,6 +1154,10 @@ const docTemplate = `{
                         "$ref": "#/definitions/github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.TrainedExerciseResponse"
                     }
                 },
+                "finished_at": {
+                    "type": "string",
+                    "example": "2023-10-05T16:30:00Z"
+                },
                 "id": {
                     "type": "integer",
                     "example": 1
@@ -1130,7 +1166,7 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
-                "planned": {
+                "planned_date": {
                     "type": "string",
                     "example": "2023-10-05T15:00:00Z"
                 },
@@ -1138,9 +1174,21 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 5
                 },
-                "total_time": {
+                "started_at": {
+                    "type": "string",
+                    "example": "2023-10-05T15:00:00Z"
+                },
+                "total_duration": {
                     "type": "string",
                     "example": "1h30m"
+                },
+                "total_exercise_time": {
+                    "type": "string",
+                    "example": "1h"
+                },
+                "total_rest_time": {
+                    "type": "string",
+                    "example": "30m"
                 },
                 "user_id": {
                     "type": "string",
@@ -1175,9 +1223,6 @@ const docTemplate = `{
         },
         "github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.UpdateTrainedExerciseRequest": {
             "type": "object",
-            "required": [
-                "id"
-            ],
             "properties": {
                 "approaches": {
                     "type": "integer",
@@ -1185,10 +1230,9 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 4
                 },
-                "id": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "example": 1
+                "doing": {
+                    "type": "string",
+                    "example": "1h15m"
                 },
                 "notes": {
                     "type": "string",
@@ -1200,9 +1244,13 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 12
                 },
+                "rest": {
+                    "type": "string",
+                    "example": "30m"
+                },
                 "time": {
                     "type": "string",
-                    "example": "2023-10-05T15:45:00Z"
+                    "example": "1h45m"
                 },
                 "weight": {
                     "type": "number",
@@ -1215,24 +1263,22 @@ const docTemplate = `{
         "github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.UpdateTrainingRequest": {
             "type": "object",
             "required": [
-                "id",
-                "planned"
+                "planned_date"
             ],
             "properties": {
-                "done": {
+                "actual_date": {
                     "type": "string",
                     "example": "2023-10-05T16:30:00Z"
                 },
-                "id": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "example": 1
+                "finished_at": {
+                    "type": "string",
+                    "example": "2023-10-05T16:30:00Z"
                 },
                 "is_done": {
                     "type": "boolean",
                     "example": true
                 },
-                "planned": {
+                "planned_date": {
                     "type": "string",
                     "example": "2023-10-05T15:00:00Z"
                 },
@@ -1242,9 +1288,21 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 5
                 },
-                "total_time": {
+                "started_at": {
+                    "type": "string",
+                    "example": "2023-10-05T15:00:00Z"
+                },
+                "total_duration": {
                     "type": "string",
                     "example": "1h30m"
+                },
+                "total_exercise_time": {
+                    "type": "string",
+                    "example": "1h"
+                },
+                "total_rest_time": {
+                    "type": "string",
+                    "example": "30m"
                 }
             }
         }

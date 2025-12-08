@@ -39,3 +39,23 @@ func nullStringFromSQL(ss sql.NullString) *string {
 	}
 	return &ss.String
 }
+
+
+func durationToNullInt64(d *time.Duration) sql.NullInt64 {
+	if d == nil {
+		return sql.NullInt64{Valid: false}
+	}
+	microseconds := d.Microseconds()
+	return sql.NullInt64{
+		Int64: microseconds,
+		Valid: true,
+	}
+}
+
+func sqlNullInt64ToDuration(n sql.NullInt64) *time.Duration {
+    if !n.Valid {
+        return nil
+    }
+    duration := time.Duration(n.Int64) * time.Microsecond
+    return &duration
+}
