@@ -24,7 +24,7 @@ func NewExerciseHandler(svc svcexercise.ExerciseService) *ExerciseHandler {
 // @Produce      json
 // @Success      200  {array}   dto.ExerciseResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/exercises [get]
+// @Router       /exercises [get]
 func (h *ExerciseHandler) GetAllExercises(c *gin.Context) {
 	exercises, err := h.svc.GetAllExercises(c.Request.Context())
 	if err != nil {
@@ -50,7 +50,7 @@ func (h *ExerciseHandler) GetAllExercises(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/exercises/{id} [get]
+// @Router       /exercises/{id} [get]
 func (h *ExerciseHandler) GetExerciseByID(c *gin.Context) {
 	exerciseID, err := parseInt64Param(c, "id")
 	if err != nil {
@@ -76,7 +76,7 @@ func (h *ExerciseHandler) GetExerciseByID(c *gin.Context) {
 // @Success      200  {array}   dto.ExerciseResponse
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/exercises/tag/{tag_id} [get]
+// @Router       /exercises/tag/{tag_id} [get]
 func (h *ExerciseHandler) GetExercisesByTag(c *gin.Context) {
 	tagID, err := parseInt64Param(c, "tag_id")
 	if err != nil {
@@ -110,7 +110,7 @@ func (h *ExerciseHandler) GetExercisesByTag(c *gin.Context) {
 // @Success      200  {array}   dto.ExerciseResponse
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/exercises/search [get]
+// @Router       /exercises/search [get]
 func (h *ExerciseHandler) SearchExercises(c *gin.Context) {
 	var req dto.SearchExercisesRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -144,7 +144,7 @@ func (h *ExerciseHandler) SearchExercises(c *gin.Context) {
 // @Produce      json
 // @Success      200  {array}   dto.TagResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/tags [get]
+// @Router       /tags [get]
 func (h *ExerciseHandler) GetAllTags(c *gin.Context) {
 	tags, err := h.svc.GetAllTags(c.Request.Context())
 	if err != nil {
@@ -170,7 +170,7 @@ func (h *ExerciseHandler) GetAllTags(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/tags/{id} [get]
+// @Router       /tags/{id} [get]
 func (h *ExerciseHandler) GetTagByID(c *gin.Context) {
 	tagID, err := parseInt64Param(c, "id")
 	if err != nil {
@@ -196,7 +196,7 @@ func (h *ExerciseHandler) GetTagByID(c *gin.Context) {
 // @Success      200  {array}   dto.TagResponse
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/exercises/{exercise_id}/tags [get]
+// @Router       /exercises/{exercise_id}/tags [get]
 func (h *ExerciseHandler) GetExerciseTags(c *gin.Context) {
 	exerciseID, err := parseInt64Param(c, "exercise_id")
 	if err != nil {
@@ -228,7 +228,7 @@ func (h *ExerciseHandler) GetExerciseTags(c *gin.Context) {
 // @Success      200  {array}   dto.ExerciseResponse
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/exercises/by-tags [post]
+// @Router       /exercises/by-tags [post]
 func (h *ExerciseHandler) GetExercisesByMultipleTags(c *gin.Context) {
 	var req dto.GetExercisesByMultipleTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -264,7 +264,7 @@ func (h *ExerciseHandler) GetExercisesByMultipleTags(c *gin.Context) {
 // @Success      200  {array}   dto.TagResponse
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/tags/popular [get]
+// @Router       /tags/popular [get]
 func (h *ExerciseHandler) GetPopularTags(c *gin.Context) {
 	var req dto.GetPopularTagsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

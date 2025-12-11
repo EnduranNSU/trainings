@@ -22,6 +22,13 @@ type Training struct {
 	Exercises         []TrainedExercise `db:"exercises" json:"exercises"`
 }
 
+type TrainingStats struct {
+	TotalTrainings     int64         `json:"total_trainings"`
+	CompletedTrainings int64         `json:"completed_trainings"`
+	AverageRating      float64       `json:"average_rating"`
+	TotalDuration      time.Duration `json:"total_time"`
+}
+
 type TrainedExercise struct {
 	ID         int64            `db:"id" json:"id"`
 	TrainingID int64            `db:"training_id" json:"training_id"`
@@ -50,4 +57,16 @@ type Tag struct {
 type ExerciseFilter struct {
 	TagID  *int64
 	Search *string
+}
+
+type TrainingTime struct {
+	TotalExerciseSeconds int64 `json:"total_exercise_seconds"`
+	TotalRestSeconds     int64 `json:"total_rest_seconds"`
+	TotalSeconds         int64 `json:"total_seconds"`
+}
+
+type GlobalTraining struct {
+	ID        int64      `json:"id"`
+	Level     string     `json:"level"`
+	Exercises []Exercise `json:"exercises"`
 }

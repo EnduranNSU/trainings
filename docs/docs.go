@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/exercises": {
+        "/exercises": {
             "get": {
                 "description": "Возвращает список всех упражнений",
                 "produces": [
@@ -44,7 +44,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/exercises/by-tags": {
+        "/exercises/by-tags": {
             "post": {
                 "description": "Возвращает список упражнений, связанных со всеми указанными тегами",
                 "consumes": [
@@ -93,7 +93,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/exercises/search": {
+        "/exercises/search": {
             "get": {
                 "description": "Возвращает список упражнений, соответствующих поисковому запросу и фильтрам",
                 "produces": [
@@ -156,7 +156,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/exercises/tag/{tag_id}": {
+        "/exercises/tag/{tag_id}": {
             "get": {
                 "description": "Возвращает список упражнений, связанных с указанным тегом",
                 "produces": [
@@ -201,7 +201,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/exercises/{exercise_id}/tags": {
+        "/exercises/{exercise_id}/tags": {
             "get": {
                 "description": "Возвращает список тегов, связанных с указанным упражнением",
                 "produces": [
@@ -246,7 +246,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/exercises/{id}": {
+        "/exercises/{id}": {
             "get": {
                 "description": "Возвращает информацию об упражнении по его ID",
                 "produces": [
@@ -294,7 +294,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/tags": {
+        "/tags": {
             "get": {
                 "description": "Возвращает список всех тегов",
                 "produces": [
@@ -323,7 +323,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/tags/popular": {
+        "/tags/popular": {
             "get": {
                 "description": "Возвращает список самых популярных тегов",
                 "produces": [
@@ -369,7 +369,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/tags/{id}": {
+        "/tags/{id}": {
             "get": {
                 "description": "Возвращает информацию о теге по его ID",
                 "produces": [
@@ -417,7 +417,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/training-exercises": {
+        "/training-exercises": {
             "post": {
                 "description": "Добавляет упражнение к существующей тренировке",
                 "consumes": [
@@ -520,7 +520,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/training-exercises/{id}": {
+        "/training-exercises/{id}": {
             "put": {
                 "description": "Обновляет информацию о выполненном упражнении в тренировке",
                 "consumes": [
@@ -580,7 +580,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/trainings": {
+        "/trainings": {
             "get": {
                 "description": "Возвращает все тренировки указанного пользователя",
                 "produces": [
@@ -674,7 +674,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/trainings/stats": {
+        "/trainings/stats": {
             "get": {
                 "description": "Возвращает статистику тренировок пользователя",
                 "produces": [
@@ -721,7 +721,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/trainings/{id}": {
+        "/trainings/{id}": {
             "get": {
                 "description": "Возвращает информацию о тренировке со списком упражнений",
                 "produces": [
@@ -870,7 +870,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/trainings/{id}/complete": {
+        "/trainings/{id}/complete": {
             "patch": {
                 "description": "Отмечает тренировку как завершенную и устанавливает рейтинг",
                 "consumes": [
@@ -1311,12 +1311,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
+	Version:          "1.0",
 	Host:             "",
-	BasePath:         "",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Enduran User Info API",
+	Description:      "Сервис информации о тренировках и упражнения",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

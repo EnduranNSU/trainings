@@ -1,3 +1,7 @@
+// @title Trainig API
+// @version 1.0
+// @description Сервис информации о тренировках и упражнения
+// @BasePath /api/v1
 package httpin
 
 import (
@@ -8,6 +12,11 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// NewGinRouter создает новый Gin router
+// @title Enduran User Info API
+// @version 1.0
+// @description Сервис информации о тренировках и упражнения
+// @BasePath /api/v1
 func NewGinRouter(training *TrainingHandler, exercise *ExerciseHandler) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -19,7 +28,7 @@ func NewGinRouter(training *TrainingHandler, exercise *ExerciseHandler) *gin.Eng
 	api := r.Group("/api/v1")
 	{
 		// Training routes
-		trainings := api.Group("/trainings/training")
+		trainings := api.Group("/training")
 		{
 			trainings.GET("", training.GetTrainingsByUser)
 			trainings.POST("", training.CreateTraining)
@@ -31,7 +40,7 @@ func NewGinRouter(training *TrainingHandler, exercise *ExerciseHandler) *gin.Eng
 		}
 
 		// Training exercises routes
-		trainingExercises := api.Group("/trainings/training-exercises")
+		trainingExercises := api.Group("/training-exercises")
 		{
 			trainingExercises.POST("", training.AddExerciseToTraining)
 			trainingExercises.PUT("/:id", training.UpdateTrainedExercise)
@@ -39,7 +48,7 @@ func NewGinRouter(training *TrainingHandler, exercise *ExerciseHandler) *gin.Eng
 		}
 
 		// Exercise routes
-		exercises := api.Group("/trainings/exercises")
+		exercises := api.Group("/exercises")
 		{
 			exercises.GET("", exercise.GetAllExercises)
 			exercises.GET("/search", exercise.SearchExercises)
@@ -50,7 +59,7 @@ func NewGinRouter(training *TrainingHandler, exercise *ExerciseHandler) *gin.Eng
 		}
 
 		// Tag routes
-		tags := api.Group("/trainings/tags")
+		tags := api.Group("/tags")
 		{
 			tags.GET("", exercise.GetAllTags)
 			tags.GET("/popular", exercise.GetPopularTags)

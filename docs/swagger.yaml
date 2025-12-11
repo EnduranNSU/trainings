@@ -1,3 +1,4 @@
+basePath: /api/v1
 definitions:
   github_com_EnduranNSU_trainings_internal_adapter_in_http_dto.AddExerciseToTrainingRequest:
     properties:
@@ -277,8 +278,11 @@ definitions:
     type: object
 info:
   contact: {}
+  description: Сервис информации о тренировках и упражнения
+  title: Enduran User Info API
+  version: "1.0"
 paths:
-  /api/v1/exercises:
+  /exercises:
     get:
       description: Возвращает список всех упражнений
       produces:
@@ -297,7 +301,7 @@ paths:
       summary: Получить все упражнения
       tags:
       - exercises
-  /api/v1/exercises/{exercise_id}/tags:
+  /exercises/{exercise_id}/tags:
     get:
       description: Возвращает список тегов, связанных с указанным упражнением
       parameters:
@@ -327,7 +331,7 @@ paths:
       summary: Получить теги упражнения
       tags:
       - exercises
-  /api/v1/exercises/{id}:
+  /exercises/{id}:
     get:
       description: Возвращает информацию об упражнении по его ID
       parameters:
@@ -359,7 +363,7 @@ paths:
       summary: Получить упражнение по ID
       tags:
       - exercises
-  /api/v1/exercises/by-tags:
+  /exercises/by-tags:
     post:
       consumes:
       - application/json
@@ -391,7 +395,7 @@ paths:
       summary: Получить упражнения по нескольким тегам
       tags:
       - exercises
-  /api/v1/exercises/search:
+  /exercises/search:
     get:
       description: Возвращает список упражнений, соответствующих поисковому запросу
         и фильтрам
@@ -434,7 +438,7 @@ paths:
       summary: Поиск упражнений
       tags:
       - exercises
-  /api/v1/exercises/tag/{tag_id}:
+  /exercises/tag/{tag_id}:
     get:
       description: Возвращает список упражнений, связанных с указанным тегом
       parameters:
@@ -464,7 +468,7 @@ paths:
       summary: Получить упражнения по тегу
       tags:
       - exercises
-  /api/v1/tags:
+  /tags:
     get:
       description: Возвращает список всех тегов
       produces:
@@ -483,7 +487,7 @@ paths:
       summary: Получить все теги
       tags:
       - tags
-  /api/v1/tags/{id}:
+  /tags/{id}:
     get:
       description: Возвращает информацию о теге по его ID
       parameters:
@@ -515,7 +519,7 @@ paths:
       summary: Получить тег по ID
       tags:
       - tags
-  /api/v1/tags/popular:
+  /tags/popular:
     get:
       description: Возвращает список самых популярных тегов
       parameters:
@@ -546,7 +550,7 @@ paths:
       summary: Получить популярные теги
       tags:
       - tags
-  /api/v1/training-exercises:
+  /training-exercises:
     delete:
       description: Удаляет упражнение из тренировки
       parameters:
@@ -615,7 +619,7 @@ paths:
       summary: Добавить упражнение к тренировке
       tags:
       - training-exercises
-  /api/v1/training-exercises/{id}:
+  /training-exercises/{id}:
     put:
       consumes:
       - application/json
@@ -655,7 +659,7 @@ paths:
       summary: Обновить выполненное упражнение
       tags:
       - training-exercises
-  /api/v1/trainings:
+  /trainings:
     get:
       description: Возвращает все тренировки указанного пользователя
       parameters:
@@ -717,7 +721,7 @@ paths:
       summary: Создать тренировку
       tags:
       - trainings
-  /api/v1/trainings/{id}:
+  /trainings/{id}:
     delete:
       description: Удаляет тренировку по ID
       parameters:
@@ -817,7 +821,7 @@ paths:
       summary: Обновить тренировку
       tags:
       - trainings
-  /api/v1/trainings/{id}/complete:
+  /trainings/{id}/complete:
     patch:
       consumes:
       - application/json
@@ -857,7 +861,7 @@ paths:
       summary: Завершить тренировку
       tags:
       - trainings
-  /api/v1/trainings/stats:
+  /trainings/stats:
     get:
       description: Возвращает статистику тренировок пользователя
       parameters:

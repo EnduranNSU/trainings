@@ -31,7 +31,7 @@ func NewTrainingHandler(svc svctraining.TrainingService) *TrainingHandler {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings [get]
+// @Router       /trainings [get]
 func (h *TrainingHandler) GetTrainingsByUser(c *gin.Context) {
 	uidStr := c.Query("user_id")
 	uid, err := uuid.Parse(uidStr)
@@ -69,7 +69,7 @@ func (h *TrainingHandler) GetTrainingsByUser(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings/{id} [get]
+// @Router       /trainings/{id} [get]
 func (h *TrainingHandler) GetTrainingWithExercises(c *gin.Context) {
 	trainingID, err := parseInt64Param(c, "id")
 	if err != nil {
@@ -96,7 +96,7 @@ func (h *TrainingHandler) GetTrainingWithExercises(c *gin.Context) {
 // @Success      201  {object}  dto.TrainingResponse
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings [post]
+// @Router       /trainings [post]
 func (h *TrainingHandler) CreateTraining(c *gin.Context) {
 	var req dto.CreateTrainingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -205,7 +205,7 @@ func (h *TrainingHandler) CreateTraining(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings/{id} [put]
+// @Router       /trainings/{id} [put]
 func (h *TrainingHandler) UpdateTraining(c *gin.Context) {
 	trainingID, err := parseInt64Param(c, "id")
 	if err != nil {
@@ -310,7 +310,7 @@ func (h *TrainingHandler) UpdateTraining(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings/{id} [delete]
+// @Router       /trainings/{id} [delete]
 func (h *TrainingHandler) DeleteTraining(c *gin.Context) {
 	trainingID, err := parseInt64Param(c, "id")
 	if err != nil {
@@ -338,7 +338,7 @@ func (h *TrainingHandler) DeleteTraining(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/training-exercises [post]
+// @Router       /training-exercises [post]
 func (h *TrainingHandler) AddExerciseToTraining(c *gin.Context) {
 	var req dto.AddExerciseToTrainingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -422,7 +422,7 @@ func (h *TrainingHandler) AddExerciseToTraining(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/training-exercises/{id} [put]
+// @Router       /training-exercises/{id} [put]
 func (h *TrainingHandler) UpdateTrainedExercise(c *gin.Context) {
 	exerciseID, err := parseInt64Param(c, "id")
 	if err != nil {
@@ -510,7 +510,7 @@ func (h *TrainingHandler) UpdateTrainedExercise(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/training-exercises [delete]
+// @Router       /training-exercises [delete]
 func (h *TrainingHandler) RemoveExerciseFromTraining(c *gin.Context) {
 	trainingID, err := parseInt64Query(c, "training_id")
 	if err != nil {
@@ -543,7 +543,7 @@ func (h *TrainingHandler) RemoveExerciseFromTraining(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings/stats [get]
+// @Router       /trainings/stats [get]
 func (h *TrainingHandler) GetUserTrainingStats(c *gin.Context) {
 	uidStr := c.Query("user_id")
 	uid, err := uuid.Parse(uidStr)
@@ -562,7 +562,7 @@ func (h *TrainingHandler) GetUserTrainingStats(c *gin.Context) {
 		TotalTrainings:     stats.TotalTrainings,
 		CompletedTrainings: stats.CompletedTrainings,
 		AverageRating:      stats.AverageRating,
-		TotalDuration:      stats.TotalTime,
+		TotalDuration:      stats.TotalDuration.String(),
 	}
 
 	c.JSON(http.StatusOK, resp)
@@ -580,7 +580,7 @@ func (h *TrainingHandler) GetUserTrainingStats(c *gin.Context) {
 // @Failure      400  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
-// @Router       /api/v1/trainings/{id}/complete [patch]
+// @Router       /trainings/{id}/complete [patch]
 func (h *TrainingHandler) CompleteTraining(c *gin.Context) {
 	trainingID, err := parseInt64Param(c, "id")
 	if err != nil {
