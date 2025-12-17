@@ -7,11 +7,14 @@ import (
 
 	"github.com/EnduranNSU/trainings/internal/domain"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 var (
 	ErrInvalidTrainingID = errors.New("invalid training id")
 	ErrTrainingNotFound  = errors.New("training not found")
+	ErrInvalidUserID     = errors.New("invalid user id")
+	ErrTrainingNotActive = errors.New("training is not active")
 )
 
 func NewTrainingService(repo domain.TrainingRepository) domain.TrainingService {
@@ -181,26 +184,6 @@ func (s *trainingService) RemoveExerciseFromTraining(ctx context.Context, traini
 	return s.repo.DeleteExerciseFromTraining(ctx, exerciseID, trainingID)
 }
 
-func (s *trainingService) StartTraining(ctx context.Context, trainingID int64) (*domain.Training, error) {
-	if trainingID <= 0 {
-		return nil, ErrInvalidTrainingID
-	}
-
-	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
-	if err != nil {
-		return nil, ErrTrainingNotFound
-	}
-
-	if training.StartedAt != nil {
-		return training, nil // Уже начата
-	}
-
-	now := time.Now().UTC()
-	training.StartedAt = &now
-
-	return s.repo.UpdateTraining(ctx, training)
-}
-
 func (s *trainingService) CompleteTraining(ctx context.Context, trainingID int64, rating *int32) (*domain.Training, error) {
 	if trainingID <= 0 {
 		return nil, ErrInvalidTrainingID
@@ -224,4 +207,309 @@ func (s *trainingService) CompleteTraining(ctx context.Context, trainingID int64
 	}
 
 	return s.repo.UpdateTraining(ctx, training)
+}
+
+
+func (s *trainingService) UpdateExerciseTime(ctx context.Context, exerciseID int64, weight *decimal.Decimal, approaches *int32, reps *int32, time *time.Duration, doing *time.Duration, rest *time.Duration) (*domain.TrainedExercise, error) {
+	if exerciseID <= 0 {
+		return nil, ErrInvalidExerciseID
+	}
+
+	// Создаем объект упражнения с обновленными временными параметрами
+	exercise := &domain.TrainedExercise{
+		ID:         exerciseID,
+		Weight:     weight,
+		Approaches: approaches,
+		Reps:       reps,
+		Time:       time,
+		Doing:      doing,
+		Rest:       rest,
+	}
+
+	return s.repo.UpdateExerciseTime(ctx, exercise)
+}
+
+func (s *trainingService) UpdateTrainingTimers(ctx context.Context, trainingID int64, totalDuration *time.Duration, totalRestTime *time.Duration, totalExerciseTime *time.Duration) (*domain.Training, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+
+	// Получаем существующую тренировку
+	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	// Обновляем таймеры
+	if totalDuration != nil {
+		training.TotalDuration = totalDuration
+	}
+	if totalRestTime != nil {
+		training.TotalRestTime = totalRestTime
+	}
+	if totalExerciseTime != nil {
+		training.TotalExerciseTime = totalExerciseTime
+	}
+
+	return s.repo.UpdateTrainingTimers(ctx, training)
+}
+
+func (s *trainingService) CalculateTrainingTotalTime(ctx context.Context, trainingID int64) (*domain.TrainingTime, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+
+	// Проверяем существование тренировки
+	_, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	return s.repo.CalculateTrainingTotalTime(ctx, trainingID)
+}
+
+func (s *trainingService) GetCurrentTraining(ctx context.Context, userID uuid.UUID) (*domain.Training, error) {
+	if userID == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+
+	return s.repo.GetCurrentTraining(ctx, userID)
+}
+
+func (s *trainingService) GetTodaysTraining(ctx context.Context, userID uuid.UUID) ([]*domain.Training, error) {
+	if userID == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+
+	trainings, err := s.repo.GetTodaysTraining(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Если нет тренировок на сегодня, можно создать новую или вернуть пустой список
+	// В зависимости от бизнес-логики:
+	// 1. Создать новую тренировку на сегодня
+	// 2. Вернуть тренировки, запланированные на сегодня
+	// 3. Вернуть активную тренировку (если есть)
+
+	return trainings, nil
+}
+
+func (s *trainingService) GetGlobalTrainings(ctx context.Context) ([]*domain.GlobalTraining, error) {
+	return s.repo.GetGlobalTrainings(ctx)
+}
+
+func (s *trainingService) GetGlobalTrainingByLevel(ctx context.Context, level string) (*domain.GlobalTraining, error) {
+	if level == "" {
+		return nil, errors.New("level is required")
+	}
+
+	return s.repo.GetGlobalTrainingByLevel(ctx, level)
+}
+
+func (s *trainingService) GetGlobalTrainingWithTags(ctx context.Context, level string) (*domain.GlobalTraining, error) {
+	if level == "" {
+		return nil, errors.New("level is required")
+	}
+
+	// Получаем глобальную тренировку с тегами
+	globalTraining, err := s.repo.GetGlobalTrainingWithTags(ctx, level)
+	if err != nil {
+		return nil, err
+	}
+
+	// Можно добавить дополнительную логику, например:
+	// 1. Валидацию наличия упражнений
+	// 2. Проверку доступности ресурсов
+	// 3. Логирование запросов
+
+	return globalTraining, nil
+}
+
+func (s *trainingService) MarkTrainingAsDone(ctx context.Context, trainingID int64, userID uuid.UUID) (*domain.Training, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+	if userID == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+
+	// Проверяем, что тренировка принадлежит пользователю
+	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	if training.UserID != userID {
+		return nil, errors.New("training does not belong to user")
+	}
+
+	// Проверяем, что тренировка не завершена
+	if training.IsDone {
+		return training, nil // Уже завершена
+	}
+
+	// Завершаем тренировку
+	return s.repo.MarkTrainingAsDone(ctx, trainingID, userID)
+}
+
+func (s *trainingService) GetTrainingStats(ctx context.Context, trainingID int64) (*domain.TrainingStats, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+
+	return s.repo.GetTrainingStats(ctx, trainingID)
+}
+
+func (s *trainingService) StartTraining(ctx context.Context, trainingID int64, userID uuid.UUID) (*domain.Training, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+	if userID == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+
+	// Проверяем, что тренировка принадлежит пользователю
+	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	if training.UserID != userID {
+		return nil, errors.New("training does not belong to user")
+	}
+
+	// Проверяем, что тренировка еще не начата
+	if training.StartedAt != nil {
+		return training, nil // Уже начата
+	}
+
+	// Начинаем тренировку
+	return s.repo.StartTraining(ctx, trainingID, userID)
+}
+
+// Дополнительные методы для управления временем тренировки
+
+func (s *trainingService) UpdateExerciseRestTime(ctx context.Context, exerciseID int64, restTime time.Duration) (*domain.TrainedExercise, error) {
+	if exerciseID <= 0 {
+		return nil, ErrInvalidExerciseID
+	}
+
+	// Получаем упражнение
+	// В реальной реализации нужно получить упражнение из репозитория
+	// Для примера создаем новый объект
+	exercise := &domain.TrainedExercise{
+		ID:   exerciseID,
+		Rest: &restTime,
+	}
+
+	return s.repo.UpdateExerciseTime(ctx, exercise)
+}
+
+func (s *trainingService) UpdateExerciseDoingTime(ctx context.Context, exerciseID int64, doingTime time.Duration) (*domain.TrainedExercise, error) {
+	if exerciseID <= 0 {
+		return nil, ErrInvalidExerciseID
+	}
+
+	exercise := &domain.TrainedExercise{
+		ID:    exerciseID,
+		Doing: &doingTime,
+	}
+
+	return s.repo.UpdateExerciseTime(ctx, exercise)
+}
+
+func (s *trainingService) PauseTraining(ctx context.Context, trainingID int64) (*domain.Training, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+
+	// Получаем тренировку
+	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	// Проверяем, что тренировка начата
+	if training.StartedAt == nil {
+		return nil, ErrTrainingNotActive
+	}
+
+	// В реальной реализации здесь можно:
+	// 1. Сохранить время паузы
+	// 2. Обновить общее время тренировки
+	// 3. Запустить таймер паузы
+
+	return training, nil
+}
+
+func (s *trainingService) ResumeTraining(ctx context.Context, trainingID int64) (*domain.Training, error) {
+	if trainingID <= 0 {
+		return nil, ErrInvalidTrainingID
+	}
+
+	// Получаем тренировку
+	training, err := s.repo.GetTrainingWithExercises(ctx, trainingID)
+	if err != nil {
+		return nil, ErrTrainingNotFound
+	}
+
+	// Проверяем, что тренировка начата
+	if training.StartedAt == nil {
+		return nil, ErrTrainingNotActive
+	}
+
+	// В реальной реализации здесь можно:
+	// 1. Обновить время тренировки с учетом паузы
+	// 2. Запустить таймер заново
+
+	return training, nil
+}
+
+// Метод для копирования глобальной тренировки в пользовательскую
+func (s *trainingService) CopyGlobalTrainingToUser(ctx context.Context, level string, userID uuid.UUID, plannedDate time.Time) (*domain.Training, error) {
+	if userID == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+	if level == "" {
+		return nil, errors.New("level is required")
+	}
+	if plannedDate.IsZero() {
+		return nil, errors.New("planned date is required")
+	}
+
+	// Получаем глобальную тренировку
+	globalTraining, err := s.repo.GetGlobalTrainingWithTags(ctx, level)
+	if err != nil {
+		return nil, err
+	}
+
+	// Создаем новую тренировку для пользователя
+	training := &domain.Training{
+		UserID:      userID,
+		IsDone:      false,
+		PlannedDate: plannedDate,
+		Exercises:   []domain.TrainedExercise{},
+	}
+
+	// Создаем тренировку
+	createdTraining, err := s.repo.CreateTraining(ctx, training)
+	if err != nil {
+		return nil, err
+	}
+
+	// Добавляем упражнения из глобальной тренировки
+	for _, exercise := range globalTraining.Exercises {
+		_, err := s.repo.AddExerciseToTraining(ctx, &domain.TrainedExercise{
+			TrainingID: createdTraining.ID,
+			ExerciseID: exercise.ID,
+		})
+		if err != nil {
+			// В случае ошибки можно удалить созданную тренировку или продолжить
+			return nil, err
+		}
+	}
+
+	// Получаем полную тренировку с упражнениями
+	return s.repo.GetTrainingWithExercises(ctx, createdTraining.ID)
 }
