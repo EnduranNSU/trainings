@@ -13,8 +13,10 @@ import (
 
 type Exercise struct {
 	ID          int64  `json:"id"`
+	Title       string `json:"title"`
 	Description string `json:"description"`
-	Href        string `json:"href"`
+	VideoUrl    string `json:"video_url"`
+	ImageUrl    string `json:"image_url"`
 }
 
 type ExerciseToTag struct {
@@ -23,8 +25,10 @@ type ExerciseToTag struct {
 }
 
 type GlobalTraining struct {
-	ID    int64  `json:"id"`
-	Level string `json:"level"`
+	ID          int64  `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Level       string `json:"level"`
 }
 
 type GlobalTrainingExercise struct {
@@ -53,6 +57,7 @@ type TrainedExercise struct {
 
 type Training struct {
 	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
 	UserID            uuid.UUID     `json:"user_id"`
 	IsDone            bool          `json:"is_done"`
 	PlannedDate       time.Time     `json:"planned_date"`

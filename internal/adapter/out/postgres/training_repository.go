@@ -59,12 +59,18 @@ func (r *TrainingRepositoryImpl) GetTrainingWithExercises(ctx context.Context, t
 		logging.Error(err, "GetTrainingWithExercises", jsonData, "failed to get training with exercises")
 		return nil, err
 	}
+	jsonData := logging.MarshalLogData(map[string]interface{}{
+		"result": training,
+	})
+	logging.Debug("GetTrainingWithExercises", jsonData, "successfully retrieved training with exercises")
+
 
 	domainTraining := r.toDomainTrainingFromJoined(training)
 
-	jsonData := logging.MarshalLogData(map[string]interface{}{
+	jsonData = logging.MarshalLogData(map[string]interface{}{
 		"training_id":     trainingID,
 		"exercises_count": len(domainTraining.Exercises),
+		"result": domainTraining,
 	})
 	logging.Debug("GetTrainingWithExercises", jsonData, "successfully retrieved training with exercises")
 
@@ -73,6 +79,7 @@ func (r *TrainingRepositoryImpl) GetTrainingWithExercises(ctx context.Context, t
 
 func (r *TrainingRepositoryImpl) CreateTraining(ctx context.Context, training *domain.Training) (*domain.Training, error) {
 	params := gen.CreateTrainingParams{
+		Title:             training.Title,
 		UserID:            training.UserID,
 		IsDone:            training.IsDone,
 		PlannedDate:       training.PlannedDate,
@@ -96,7 +103,19 @@ func (r *TrainingRepositoryImpl) CreateTraining(ctx context.Context, training *d
 		return nil, err
 	}
 
-	domainTraining := r.toDomainTrainingFromGen(created)
+	domainTraining := r.toDomainTraining(gen.GetTrainingsByUserRow{
+		ID:                created.ID,
+		UserID:            created.UserID,
+		IsDone:            created.IsDone,
+		PlannedDate:       created.PlannedDate,
+		ActualDate:        created.ActualDate,
+		StartedAt:         created.StartedAt,
+		FinishedAt:        created.FinishedAt,
+		TotalDuration:     created.TotalDuration,
+		TotalRestTime:     created.TotalRestTime,
+		TotalExerciseTime: created.TotalExerciseTime,
+		Rating:            created.Rating,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"training_id": domainTraining.ID,
@@ -119,6 +138,7 @@ func (r *TrainingRepositoryImpl) UpdateTraining(ctx context.Context, training *d
 		TotalExerciseTime: durationToNullInt64(training.TotalExerciseTime),
 		Rating:            null.Int32FromPtr(training.Rating).NullInt32,
 		ID:                training.ID,
+		Title:             training.Title,
 	}
 
 	updated, err := r.q.UpdateTraining(ctx, params)
@@ -132,7 +152,19 @@ func (r *TrainingRepositoryImpl) UpdateTraining(ctx context.Context, training *d
 		return nil, err
 	}
 
-	domainTraining := r.toDomainTrainingFromGen(updated)
+	domainTraining := r.toDomainTraining(gen.GetTrainingsByUserRow{
+		ID:                updated.ID,
+		UserID:            updated.UserID,
+		IsDone:            updated.IsDone,
+		PlannedDate:       updated.PlannedDate,
+		ActualDate:        updated.ActualDate,
+		StartedAt:         updated.StartedAt,
+		FinishedAt:        updated.FinishedAt,
+		TotalDuration:     updated.TotalDuration,
+		TotalRestTime:     updated.TotalRestTime,
+		TotalExerciseTime: updated.TotalExerciseTime,
+		Rating:            updated.Rating,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"training_id": domainTraining.ID,
@@ -218,7 +250,18 @@ func (r *TrainingRepositoryImpl) UpdateTrainedExercise(ctx context.Context, exer
 		return nil, err
 	}
 
-	domainExercise := r.toDomainTrainedExercise(updated)
+	domainExercise := r.toDomainTrainedExercise(gen.AddExerciseToTrainingRow{
+		ID:         updated.ID,
+		TrainingID: updated.TrainingID,
+		ExerciseID: updated.ExerciseID,
+		Weight:     updated.Weight,
+		Approaches: updated.Approaches,
+		Reps:       updated.Reps,
+		Time:       updated.Time,
+		Doing:      updated.Doing,
+		Rest:       updated.Rest,
+		Notes:      updated.Notes,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"trained_exercise_id": domainExercise.ID,
@@ -292,84 +335,38 @@ func (r *TrainingRepositoryImpl) GetUserTrainingStats(ctx context.Context, userI
 }
 
 func (r *TrainingRepositoryImpl) toDomainTraining(t gen.GetTrainingsByUserRow) *domain.Training {
-	training := &domain.Training{
+	return &domain.Training{
 		ID:                t.ID,
+		Title:             t.Title,
 		UserID:            t.UserID,
 		IsDone:            t.IsDone,
 		PlannedDate:       t.PlannedDate,
 		ActualDate:        nullTimeFromSQL(t.ActualDate),
 		StartedAt:         nullTimeFromSQL(t.StartedAt),
 		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
-		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
-		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
-		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
+		TotalDuration:     toDuration(t.TotalDuration),
+		TotalRestTime:     toDuration(t.TotalRestTime),
+		TotalExerciseTime: toDuration(t.TotalExerciseTime),
 		Rating:            nullIntFromSQL32(t.Rating),
 	}
-
-	// Преобразование упражнений
-	if t.Exercises != nil {
-		if exercisesSlice, ok := t.Exercises.([]gen.TrainedExercise); ok {
-			exercises := make([]domain.TrainedExercise, len(exercisesSlice))
-			for i, ex := range exercisesSlice {
-				weight, _ := decimal.NewFromString(ex.Weight.String)
-				exercises[i] = domain.TrainedExercise{
-					ID:         ex.ID,
-					TrainingID: training.ID,
-					ExerciseID: ex.ExerciseID,
-					Weight:     &weight,
-					Approaches: nullIntFromSQL32(ex.Approaches),
-					Reps:       nullIntFromSQL32(ex.Reps),
-					Time:       sqlNullInt64ToDuration(ex.Time),
-					Doing:      sqlNullInt64ToDuration(ex.Doing),
-					Rest:       sqlNullInt64ToDuration(ex.Rest),
-					Notes:      nullStringFromSQL(ex.Notes),
-				}
-			}
-			training.Exercises = exercises
-		}
-	}
-
-	return training
 }
 
 func (r *TrainingRepositoryImpl) toDomainTrainingFromJoined(t gen.GetTrainingWithExercisesRow) *domain.Training {
 	training := &domain.Training{
 		ID:                t.ID,
+		Title:             t.Title,
 		UserID:            t.UserID,
 		IsDone:            t.IsDone,
 		PlannedDate:       t.PlannedDate,
 		ActualDate:        nullTimeFromSQL(t.ActualDate),
 		StartedAt:         nullTimeFromSQL(t.StartedAt),
 		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
-		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
-		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
-		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
+		TotalDuration:     toDuration(t.TotalDuration),
+		TotalRestTime:     toDuration(t.TotalRestTime),
+		TotalExerciseTime: toDuration(t.TotalExerciseTime),
 		Rating:            nullIntFromSQL32(t.Rating),
+		Exercises:         toDomainTrainedExercise(t.Exercises),
 	}
-
-	// Преобразование упражнений
-	if t.Exercises != nil {
-		if exercisesSlice, ok := t.Exercises.([]gen.TrainedExercise); ok {
-			exercises := make([]domain.TrainedExercise, len(exercisesSlice))
-			for i, ex := range exercisesSlice {
-				weight, _ := decimal.NewFromString(ex.Weight.String)
-				exercises[i] = domain.TrainedExercise{
-					ID:         ex.ID,
-					TrainingID: training.ID,
-					ExerciseID: ex.ExerciseID,
-					Weight:     &weight,
-					Approaches: nullIntFromSQL32(ex.Approaches),
-					Reps:       nullIntFromSQL32(ex.Reps),
-					Time:       sqlNullInt64ToDuration(ex.Time),
-					Doing:      sqlNullInt64ToDuration(ex.Doing),
-					Rest:       sqlNullInt64ToDuration(ex.Rest),
-					Notes:      nullStringFromSQL(ex.Notes),
-				}
-			}
-			training.Exercises = exercises
-		}
-	}
-
 	return training
 }
 
@@ -379,20 +376,29 @@ func (r *TrainingRepositoryImpl) UpdateExerciseTime(ctx context.Context, exercis
 		Rest:       durationToNullInt64(exercise.Rest),
 		Time:       durationToNullInt64(exercise.Time),
 		ID:         exercise.ID,
-		TrainingID: exercise.TrainingID,
 	}
 
 	updated, err := r.q.UpdateExerciseTime(ctx, params)
 	if err != nil {
 		jsonData := logging.MarshalLogData(map[string]interface{}{
 			"trained_exercise_id": exercise.ID,
-			"training_id":         exercise.TrainingID,
 		})
 		logging.Error(err, "UpdateExerciseTime", jsonData, "failed to update exercise time")
 		return nil, err
 	}
 
-	domainExercise := r.toDomainTrainedExercise(updated)
+	domainExercise := r.toDomainTrainedExercise(gen.AddExerciseToTrainingRow{
+		ID:         updated.ID,
+		TrainingID: updated.TrainingID,
+		ExerciseID: updated.ExerciseID,
+		Weight:     updated.Weight,
+		Approaches: updated.Approaches,
+		Reps:       updated.Reps,
+		Time:       updated.Time,
+		Doing:      updated.Doing,
+		Rest:       updated.Rest,
+		Notes:      updated.Notes,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"trained_exercise_id": domainExercise.ID,
@@ -422,7 +428,19 @@ func (r *TrainingRepositoryImpl) UpdateTrainingTimers(ctx context.Context, train
 		return nil, err
 	}
 
-	domainTraining := r.toDomainTrainingFromGen(updated)
+	domainTraining := r.toDomainTraining(gen.GetTrainingsByUserRow{
+		ID:                updated.ID,
+		UserID:            updated.UserID,
+		IsDone:            updated.IsDone,
+		PlannedDate:       updated.PlannedDate,
+		ActualDate:        updated.ActualDate,
+		StartedAt:         updated.StartedAt,
+		FinishedAt:        updated.FinishedAt,
+		TotalDuration:     updated.TotalDuration,
+		TotalRestTime:     updated.TotalRestTime,
+		TotalExerciseTime: updated.TotalExerciseTime,
+		Rating:            updated.Rating,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"training_id": domainTraining.ID,
@@ -435,7 +453,6 @@ func (r *TrainingRepositoryImpl) UpdateTrainingTimers(ctx context.Context, train
 func (r *TrainingRepositoryImpl) GetCurrentTraining(ctx context.Context, userID uuid.UUID) (*domain.Training, error) {
 	t, err := r.q.GetCurrentTraining(ctx, userID)
 	if err != nil {
-		// Если нет текущей тренировки, возвращаем nil без ошибки
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -447,19 +464,20 @@ func (r *TrainingRepositoryImpl) GetCurrentTraining(ctx context.Context, userID 
 		return nil, err
 	}
 
-	domainTraining := r.toDomainTrainingFromJoinedRow(gen.Training{
-			ID: t.ID,
-			UserID: t.UserID,
-			IsDone: t.IsDone,
-			PlannedDate: t.PlannedDate,
-			ActualDate: t.ActualDate,
-			StartedAt: t.StartedAt,
-			FinishedAt: t.FinishedAt,
-			TotalDuration: t.TotalDuration,
-			TotalRestTime: t.TotalRestTime,
-			TotalExerciseTime: t.TotalExerciseTime,
-			Rating: t.Rating,
-		})
+	domainTraining := r.toDomainTraining(gen.GetTrainingsByUserRow{
+		ID:                t.ID,
+		Title:             t.Title,
+		UserID:            t.UserID,
+		IsDone:            t.IsDone,
+		PlannedDate:       t.PlannedDate,
+		ActualDate:        t.ActualDate,
+		StartedAt:         t.StartedAt,
+		FinishedAt:        t.FinishedAt,
+		TotalDuration:     t.TotalDuration,
+		TotalRestTime:     t.TotalRestTime,
+		TotalExerciseTime: t.TotalExerciseTime,
+		Rating:            t.Rating,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"user_id":         userID.String(),
@@ -483,18 +501,19 @@ func (r *TrainingRepositoryImpl) GetTodaysTraining(ctx context.Context, userID u
 
 	trainings := make([]*domain.Training, len(trainingRows))
 	for i, t := range trainingRows {
-		trainings[i] = r.toDomainTrainingFromJoinedRow(gen.Training{
-			ID: t.ID,
-			UserID: t.UserID,
-			IsDone: t.IsDone,
-			PlannedDate: t.PlannedDate,
-			ActualDate: t.ActualDate,
-			StartedAt: t.StartedAt,
-			FinishedAt: t.FinishedAt,
-			TotalDuration: t.TotalDuration,
-			TotalRestTime: t.TotalRestTime,
+		trainings[i] = r.toDomainTraining(gen.GetTrainingsByUserRow{
+			ID:                t.ID,
+			Title:             t.Title,
+			UserID:            t.UserID,
+			IsDone:            t.IsDone,
+			PlannedDate:       t.PlannedDate,
+			ActualDate:        t.ActualDate,
+			StartedAt:         t.StartedAt,
+			FinishedAt:        t.FinishedAt,
+			TotalDuration:     t.TotalDuration,
+			TotalRestTime:     t.TotalRestTime,
 			TotalExerciseTime: t.TotalExerciseTime,
-			Rating: t.Rating,
+			Rating:            t.Rating,
 		})
 	}
 
@@ -516,7 +535,13 @@ func (r *TrainingRepositoryImpl) GetGlobalTrainings(ctx context.Context) ([]*dom
 
 	globalTrainings := make([]*domain.GlobalTraining, len(globalTrainingRows))
 	for i, gt := range globalTrainingRows {
-		globalTrainings[i] = r.toDomainGlobalTraining(gt)
+		globalTrainings[i] = r.toDomainGlobalTraining(GlobalTrainingRow{
+			ID:          gt.ID,
+			Title:       gt.Title,
+			Description: gt.Description,
+			Level:       gt.Level,
+			Exercises:   gt.Exercises,
+		})
 	}
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
@@ -527,8 +552,33 @@ func (r *TrainingRepositoryImpl) GetGlobalTrainings(ctx context.Context) ([]*dom
 	return globalTrainings, nil
 }
 
-func (r *TrainingRepositoryImpl) GetGlobalTrainingByLevel(ctx context.Context, level string) (*domain.GlobalTraining, error) {
-	globalTrainingRow, err := r.q.GetGlobalTrainingByLevel(ctx, level)
+func (r *TrainingRepositoryImpl) GetGlobalTrainingById(ctx context.Context, trainingID int64) (*domain.GlobalTraining, error) {
+	gt, err := r.q.GetGlobalTrainingByID(ctx, trainingID)
+	if err != nil {
+		logging.Error(err, "GetGlobalTrainings", nil, "failed to get global trainings")
+		return nil, err
+	}
+
+	globalTraining := r.toDomainGlobalTraining(GlobalTrainingRow{
+		ID:          gt.ID,
+		Title:       gt.Title,
+		Description: gt.Description,
+		Level:       gt.Level,
+		Exercises:   gt.Exercises,
+	})
+
+	jsonData := logging.MarshalLogData(map[string]interface{}{
+		"Id":        globalTraining.ID,
+		"Level":     globalTraining.Level,
+		"Exercises": globalTraining.Exercises,
+	})
+	logging.Debug("GetGlobalTrainings", jsonData, "successfully retrieved global trainings")
+
+	return globalTraining, nil
+}
+
+func (r *TrainingRepositoryImpl) GetGlobalTrainingByLevel(ctx context.Context, level string) ([]*domain.GlobalTraining, error) {
+	globalTrainingRows, err := r.q.GetGlobalTrainingByLevel(ctx, level)
 	if err != nil {
 		jsonData := logging.MarshalLogData(map[string]interface{}{
 			"level": level,
@@ -537,36 +587,22 @@ func (r *TrainingRepositoryImpl) GetGlobalTrainingByLevel(ctx context.Context, l
 		return nil, err
 	}
 
-	globalTraining := r.toDomainGlobalTrainingByLevel(globalTrainingRow)
-
+	globalTrainings := make([]*domain.GlobalTraining, len(globalTrainingRows))
+	for i, gt := range globalTrainingRows {
+		globalTrainings[i] = r.toDomainGlobalTraining(GlobalTrainingRow{
+			ID:          gt.ID,
+			Title:       gt.Title,
+			Description: gt.Description,
+			Level:       gt.Level,
+			Exercises:   gt.Exercises,
+		})
+	}
 	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"level":           level,
-		"exercises_count": len(globalTraining.Exercises),
+		"trainings_count": len(globalTrainings),
 	})
 	logging.Debug("GetGlobalTrainingByLevel", jsonData, "successfully retrieved global training by level")
 
-	return globalTraining, nil
-}
-
-func (r *TrainingRepositoryImpl) GetGlobalTrainingWithTags(ctx context.Context, level string) (*domain.GlobalTraining, error) {
-	globalTrainingRow, err := r.q.GetGlobalTrainingWithTags(ctx, level)
-	if err != nil {
-		jsonData := logging.MarshalLogData(map[string]interface{}{
-			"level": level,
-		})
-		logging.Error(err, "GetGlobalTrainingWithTags", jsonData, "failed to get global training with tags")
-		return nil, err
-	}
-
-	globalTraining := r.toDomainGlobalTrainingWithTags(globalTrainingRow)
-
-	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"level":           level,
-		"exercises_count": len(globalTraining.Exercises),
-	})
-	logging.Debug("GetGlobalTrainingWithTags", jsonData, "successfully retrieved global training with tags")
-
-	return globalTraining, nil
+	return globalTrainings, nil
 }
 
 func (r *TrainingRepositoryImpl) MarkTrainingAsDone(ctx context.Context, trainingID int64, userID uuid.UUID) (*domain.Training, error) {
@@ -587,7 +623,20 @@ func (r *TrainingRepositoryImpl) MarkTrainingAsDone(ctx context.Context, trainin
 		return nil, err
 	}
 
-	domainTraining := r.toDomainTrainingFromGen(updated)
+	domainTraining := r.toDomainTraining(gen.GetTrainingsByUserRow{
+		ID:                updated.ID,
+		Title:             updated.Title,
+		UserID:            updated.UserID,
+		IsDone:            updated.IsDone,
+		PlannedDate:       updated.PlannedDate,
+		ActualDate:        updated.ActualDate,
+		StartedAt:         updated.StartedAt,
+		FinishedAt:        updated.FinishedAt,
+		TotalDuration:     updated.TotalDuration,
+		TotalRestTime:     updated.TotalRestTime,
+		TotalExerciseTime: updated.TotalExerciseTime,
+		Rating:            updated.Rating,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"training_id": domainTraining.ID,
@@ -616,7 +665,6 @@ func (r *TrainingRepositoryImpl) GetTrainingStats(ctx context.Context, trainingI
 	if training.TotalDuration != nil {
 		totalDuration = *training.TotalDuration
 	}
-
 
 	stats := &domain.TrainingStats{
 		TotalTrainings:     1,
@@ -659,7 +707,20 @@ func (r *TrainingRepositoryImpl) StartTraining(ctx context.Context, trainingID i
 		return nil, err
 	}
 
-	domainTraining := r.toDomainTrainingFromGen(updated)
+	domainTraining := r.toDomainTraining(gen.GetTrainingsByUserRow{
+		ID:                updated.ID,
+		Title:             updated.Title,
+		UserID:            updated.UserID,
+		IsDone:            updated.IsDone,
+		PlannedDate:       updated.PlannedDate,
+		ActualDate:        updated.ActualDate,
+		StartedAt:         updated.StartedAt,
+		FinishedAt:        updated.FinishedAt,
+		TotalDuration:     updated.TotalDuration,
+		TotalRestTime:     updated.TotalRestTime,
+		TotalExerciseTime: updated.TotalExerciseTime,
+		Rating:            updated.Rating,
+	})
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"training_id": domainTraining.ID,
@@ -670,23 +731,7 @@ func (r *TrainingRepositoryImpl) StartTraining(ctx context.Context, trainingID i
 	return domainTraining, nil
 }
 
-func (r *TrainingRepositoryImpl) toDomainTrainingFromGen(t gen.Training) *domain.Training {
-	return &domain.Training{
-		ID:                t.ID,
-		UserID:            t.UserID,
-		IsDone:            t.IsDone,
-		PlannedDate:       t.PlannedDate,
-		ActualDate:        nullTimeFromSQL(t.ActualDate),
-		StartedAt:         nullTimeFromSQL(t.StartedAt),
-		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
-		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
-		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
-		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
-		Rating:            nullIntFromSQL32(t.Rating),
-	}
-}
-
-func (r *TrainingRepositoryImpl) toDomainTrainedExercise(ex gen.TrainedExercise) *domain.TrainedExercise {
+func (r *TrainingRepositoryImpl) toDomainTrainedExercise(ex gen.AddExerciseToTrainingRow) *domain.TrainedExercise {
 	weight, _ := decimal.NewFromString(ex.Weight.String)
 	return &domain.TrainedExercise{
 		ID:         ex.ID,
@@ -695,26 +740,10 @@ func (r *TrainingRepositoryImpl) toDomainTrainedExercise(ex gen.TrainedExercise)
 		Weight:     &weight,
 		Approaches: nullIntFromSQL32(ex.Approaches),
 		Reps:       nullIntFromSQL32(ex.Reps),
-		Time:       sqlNullInt64ToDuration(ex.Time),
-		Doing:      sqlNullInt64ToDuration(ex.Doing),
-		Rest:       sqlNullInt64ToDuration(ex.Rest),
+		Time:       toDuration(ex.Time),
+		Doing:      toDuration(ex.Doing),
+		Rest:       toDuration(ex.Rest),
 		Notes:      nullStringFromSQL(ex.Notes),
-	}
-}
-
-func (r *TrainingRepositoryImpl) toDomainTrainingFromJoinedRow(t gen.Training) *domain.Training {
-	return &domain.Training{
-		ID:                t.ID,
-		UserID:            t.UserID,
-		IsDone:            t.IsDone,
-		PlannedDate:       t.PlannedDate,
-		ActualDate:        nullTimeFromSQL(t.ActualDate),
-		StartedAt:         nullTimeFromSQL(t.StartedAt),
-		FinishedAt:        nullTimeFromSQL(t.FinishedAt),
-		TotalDuration:     sqlNullInt64ToDuration(t.TotalDuration),
-		TotalRestTime:     sqlNullInt64ToDuration(t.TotalRestTime),
-		TotalExerciseTime: sqlNullInt64ToDuration(t.TotalExerciseTime),
-		Rating:            nullIntFromSQL32(t.Rating),
 	}
 }
 
@@ -764,77 +793,144 @@ func (r *TrainingRepositoryImpl) CalculateTrainingTotalTime(ctx context.Context,
 	return trainingTime, nil
 }
 
-func (r *TrainingRepositoryImpl) toDomainGlobalTraining(gt gen.GetGlobalTrainingsRow) *domain.GlobalTraining {
-	training := &domain.GlobalTraining{
-		ID: gt.ID,
-		Level: gt.Level,
-	}
-	if gt.Exercises != nil {
-		if exercisesSlice, ok := gt.Exercises.([]gen.Exercise); ok {
-			exercises := make([]domain.Exercise, len(exercisesSlice))
-			for i, ex := range exercisesSlice {
-				exercises[i] = domain.Exercise{
-					ID: ex.ID,
-					Description: ex.Description,
-					Href: ex.Href,
-				}
-			}
-			training.Exercises = exercises
-		}
-	}
-	return training
+type GlobalTrainingRow struct {
+	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Level       string      `json:"level"`
+	Exercises   interface{} `json:"exercises"`
 }
 
-func (r *TrainingRepositoryImpl) toDomainGlobalTrainingByLevel(gt gen.GetGlobalTrainingByLevelRow) *domain.GlobalTraining {
-	training := &domain.GlobalTraining{
-		ID: gt.ID,
-		Level: gt.Level,
+func (r *TrainingRepositoryImpl) toDomainGlobalTraining(gt GlobalTrainingRow) *domain.GlobalTraining {
+	return &domain.GlobalTraining{
+		ID:          gt.ID,
+		Title:       gt.Title,
+		Description: gt.Description,
+		Level:       gt.Level,
+		Exercises:   toDomainExercise(gt.Exercises),
 	}
-	if gt.Exercises != nil {
-		if exercisesSlice, ok := gt.Exercises.([]gen.Exercise); ok {
-			exercises := make([]domain.Exercise, len(exercisesSlice))
-			for i, ex := range exercisesSlice {
-				exercises[i] = domain.Exercise{
-					ID: ex.ID,
-					Description: ex.Description,
-					Href: ex.Href,
-				}
-			}
-			training.Exercises = exercises
-		}
-	}
-	return training
 }
 
-func (r *TrainingRepositoryImpl) toDomainGlobalTrainingWithTags(gt gen.GetGlobalTrainingWithTagsRow) *domain.GlobalTraining {
-	training := &domain.GlobalTraining{
-		ID: gt.ID,
-		Level: gt.Level,
+func (r *TrainingRepositoryImpl) AssignGlobalTrainingToUser(ctx context.Context, cmd domain.AssignGlobalTrainingCmd) (*domain.Training, error) {
+	// Начинаем транзакцию
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		jsonData := logging.MarshalLogData(map[string]interface{}{
+			"user_id":            cmd.UserID.String(),
+			"global_training_id": cmd.GlobalTrainingID,
+			"planned_date":       cmd.PlannedDate.Format("2006-01-02"),
+		})
+		logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to begin transaction")
+		return nil, err
 	}
-	if gt.Exercises != nil {
-		if exercisesSlice, ok := gt.Exercises.([]gen.GetExercisesWithTagsRow); ok {
-			exercises := make([]domain.Exercise, len(exercisesSlice))
-			for i, ex := range exercisesSlice {
-				exercises[i] = domain.Exercise{
-					ID: ex.ID,
-					Description: ex.Description,
-					Href: ex.Href,
-				}
-				if ex.Tags != nil {
-					if tagsSlice, ok := ex.Tags.([]gen.Tag); ok {
-						tags := make([]domain.Tag, len(tagsSlice))
-						for j, t := range tagsSlice {
-							tags[j] = domain.Tag{
-								ID: t.ID,
-								Type: t.Type,
-							}
-						}
-						exercises[i].Tags = tags
-					}
-				}
-			}
-			training.Exercises = exercises
+	defer tx.Rollback()
+
+	q := r.q.WithTx(tx)
+
+	// 1. Получаем информацию о глобальной тренировке
+	globalTraining, err := q.GetGlobalTrainingById(ctx, cmd.GlobalTrainingID)
+	if err != nil {
+		jsonData := logging.MarshalLogData(map[string]interface{}{
+			"user_id":            cmd.UserID.String(),
+			"global_training_id": cmd.GlobalTrainingID,
+		})
+		logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to get global training")
+		return nil, err
+	}
+
+	// 2. Создаем тренировку для пользователя на указанную дату
+	trainingParams := gen.CreateTrainingParams{
+		UserID:      cmd.UserID,
+		Title:       globalTraining.Title,
+		IsDone:      false,
+		PlannedDate: cmd.PlannedDate,
+		// Если тренировка на сегодня, устанавливаем actual_date
+		ActualDate: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: cmd.PlannedDate.Equal(time.Now().UTC().Truncate(24 * time.Hour)),
+		},
+		StartedAt:  null.TimeFromPtr(nil).NullTime,
+		FinishedAt: null.TimeFromPtr(nil).NullTime,
+		Rating:     null.Int32FromPtr(nil).NullInt32,
+	}
+
+	createdTraining, err := q.CreateTraining(ctx, trainingParams)
+	if err != nil {
+		jsonData := logging.MarshalLogData(map[string]interface{}{
+			"user_id":      cmd.UserID.String(),
+			"planned_date": cmd.PlannedDate.Format("2006-01-02"),
+		})
+		logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to create training")
+		return nil, err
+	}
+
+	// 3. Получаем упражнения из глобальной тренировки
+	globalExercises, err := q.GetGlobalTrainingExercises(ctx, cmd.GlobalTrainingID)
+	if err != nil {
+		jsonData := logging.MarshalLogData(map[string]interface{}{
+			"user_id":            cmd.UserID.String(),
+			"global_training_id": cmd.GlobalTrainingID,
+		})
+		logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to get global training exercises")
+		return nil, err
+	}
+
+	// 4. Добавляем упражнения в пользовательскую тренировку
+	for _, globalExercise := range globalExercises {
+		exerciseParams := gen.AddExerciseToTrainingParams{
+			TrainingID: createdTraining.ID,
+			ExerciseID: globalExercise.ExerciseID,
+			Weight:     null.StringFromPtr(nil).NullString,
+			Approaches: null.Int32FromPtr(nil).NullInt32,
+			Reps:       null.Int32FromPtr(nil).NullInt32,
+			Time:       sql.NullInt64{Valid: false},
+			Doing:      sql.NullInt64{Valid: false},
+			Rest:       sql.NullInt64{Valid: false},
+			Notes:      null.StringFromPtr(nil).NullString,
+		}
+
+		_, err := q.AddExerciseToTraining(ctx, exerciseParams)
+		if err != nil {
+			jsonData := logging.MarshalLogData(map[string]interface{}{
+				"training_id": createdTraining.ID,
+				"exercise_id": globalExercise.ExerciseID,
+			})
+			logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to add exercise to training")
+			return nil, err
 		}
 	}
-	return training
+
+	// 5. Коммитим транзакцию
+	if err := tx.Commit(); err != nil {
+		jsonData := logging.MarshalLogData(map[string]interface{}{
+			"user_id":            cmd.UserID.String(),
+			"global_training_id": cmd.GlobalTrainingID,
+			"training_id":        createdTraining.ID,
+		})
+		logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to commit transaction")
+		return nil, err
+	}
+
+	// 6. Получаем полную информацию о созданной тренировке
+	fullTraining, err := r.GetTrainingWithExercises(ctx, createdTraining.ID)
+	if err != nil {
+		jsonData := logging.MarshalLogData(map[string]interface{}{
+			"training_id": createdTraining.ID,
+		})
+		logging.Error(err, "AssignGlobalTrainingToUser", jsonData, "failed to get full training info")
+		return nil, err
+	}
+
+	jsonData := logging.MarshalLogData(map[string]interface{}{
+		"user_id":               cmd.UserID.String(),
+		"global_training_id":    cmd.GlobalTrainingID,
+		"global_training_level": globalTraining.Level,
+		"training_id":           fullTraining.ID,
+		"planned_date":          cmd.PlannedDate.Format("2006-01-02"),
+		"exercises_count":       len(fullTraining.Exercises),
+		"is_today":              cmd.PlannedDate.Equal(time.Now().UTC().Truncate(24 * time.Hour)),
+	})
+	logging.Debug("AssignGlobalTrainingToUser", jsonData, "successfully assigned global training to user")
+
+	return fullTraining, nil
 }

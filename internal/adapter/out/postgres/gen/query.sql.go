@@ -27,7 +27,17 @@ INSERT INTO trained_exercise (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
-RETURNING id, training_id, exercise_id, weight, approaches, reps, time, doing, rest, notes
+RETURNING 
+    id,
+    training_id,
+    exercise_id,
+    weight,
+    approaches,
+    reps,
+    CAST(COALESCE(EXTRACT(EPOCH FROM time)::bigint, 0) as bigint) as time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM doing)::bigint, 0)as bigint) as doing,
+    CAST(COALESCE(EXTRACT(EPOCH FROM rest)::bigint, 0)as bigint) as rest,
+    notes
 `
 
 type AddExerciseToTrainingParams struct {
@@ -42,7 +52,20 @@ type AddExerciseToTrainingParams struct {
 	Notes      sql.NullString `json:"notes"`
 }
 
-func (q *Queries) AddExerciseToTraining(ctx context.Context, arg AddExerciseToTrainingParams) (TrainedExercise, error) {
+type AddExerciseToTrainingRow struct {
+	ID         int64          `json:"id"`
+	TrainingID int64          `json:"training_id"`
+	ExerciseID int64          `json:"exercise_id"`
+	Weight     sql.NullString `json:"weight"`
+	Approaches sql.NullInt32  `json:"approaches"`
+	Reps       sql.NullInt32  `json:"reps"`
+	Time       int64          `json:"time"`
+	Doing      int64          `json:"doing"`
+	Rest       int64          `json:"rest"`
+	Notes      sql.NullString `json:"notes"`
+}
+
+func (q *Queries) AddExerciseToTraining(ctx context.Context, arg AddExerciseToTrainingParams) (AddExerciseToTrainingRow, error) {
 	row := q.db.QueryRowContext(ctx, addExerciseToTraining,
 		arg.TrainingID,
 		arg.ExerciseID,
@@ -54,7 +77,7 @@ func (q *Queries) AddExerciseToTraining(ctx context.Context, arg AddExerciseToTr
 		arg.Rest,
 		arg.Notes,
 	)
-	var i TrainedExercise
+	var i AddExerciseToTrainingRow
 	err := row.Scan(
 		&i.ID,
 		&i.TrainingID,
@@ -95,6 +118,7 @@ func (q *Queries) CalculateTrainingTotalTime(ctx context.Context, trainingID int
 
 const createTraining = `-- name: CreateTraining :one
 INSERT INTO training (
+    title,
     user_id,
     is_done,
     planned_date,
@@ -106,12 +130,25 @@ INSERT INTO training (
     total_exercise_time,
     rating
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
-RETURNING id, user_id, is_done, planned_date, actual_date, started_at, finished_at, total_duration, total_rest_time, total_exercise_time, rating
+RETURNING 
+    id,
+    title,
+    user_id,
+    is_done,
+    planned_date,
+    actual_date,
+    started_at,
+    finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    rating
 `
 
 type CreateTrainingParams struct {
+	Title             string        `json:"title"`
 	UserID            uuid.UUID     `json:"user_id"`
 	IsDone            bool          `json:"is_done"`
 	PlannedDate       time.Time     `json:"planned_date"`
@@ -124,8 +161,24 @@ type CreateTrainingParams struct {
 	Rating            sql.NullInt32 `json:"rating"`
 }
 
-func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) (Training, error) {
+type CreateTrainingRow struct {
+	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
+	UserID            uuid.UUID     `json:"user_id"`
+	IsDone            bool          `json:"is_done"`
+	PlannedDate       time.Time     `json:"planned_date"`
+	ActualDate        sql.NullTime  `json:"actual_date"`
+	StartedAt         sql.NullTime  `json:"started_at"`
+	FinishedAt        sql.NullTime  `json:"finished_at"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
+	Rating            sql.NullInt32 `json:"rating"`
+}
+
+func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) (CreateTrainingRow, error) {
 	row := q.db.QueryRowContext(ctx, createTraining,
+		arg.Title,
 		arg.UserID,
 		arg.IsDone,
 		arg.PlannedDate,
@@ -137,9 +190,10 @@ func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) 
 		arg.TotalExerciseTime,
 		arg.Rating,
 	)
-	var i Training
+	var i CreateTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,
@@ -210,18 +264,30 @@ func (q *Queries) GetAllTags(ctx context.Context) ([]Tag, error) {
 
 const getCurrentTraining = `-- name: GetCurrentTraining :one
 SELECT 
-    t.id, t.user_id, t.is_done, t.planned_date, t.actual_date, t.started_at, t.finished_at, t.total_duration, t.total_rest_time, t.total_exercise_time, t.rating,
+    t.id,
+    t.title,
+    t.user_id,
+    t.is_done,
+    t.planned_date,
+    t.actual_date,
+    t.started_at,
+    t.finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    t.rating,
     COALESCE(
         json_agg(
             json_build_object(
                 'id', te.id,
+                'training_id', te.training_id, 
                 'exercise_id', te.exercise_id,
                 'weight', te.weight,
                 'approaches', te.approaches,
                 'reps', te.reps,
-                'time', te.time,
-                'doing', te.doing,
-                'rest', te.rest,
+                'time', CAST(COALESCE(EXTRACT(EPOCH FROM te.time)::bigint, 0) as bigint),
+                'doing', CAST(COALESCE(EXTRACT(EPOCH FROM te.doing)::bigint, 0) as bigint),
+                'rest', CAST(COALESCE(EXTRACT(EPOCH FROM te.rest)::bigint, 0) as bigint),
                 'notes', te.notes
             )
         ) FILTER (WHERE te.id IS NOT NULL),
@@ -239,15 +305,16 @@ LIMIT 1
 
 type GetCurrentTrainingRow struct {
 	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
 	UserID            uuid.UUID     `json:"user_id"`
 	IsDone            bool          `json:"is_done"`
 	PlannedDate       time.Time     `json:"planned_date"`
 	ActualDate        sql.NullTime  `json:"actual_date"`
 	StartedAt         sql.NullTime  `json:"started_at"`
 	FinishedAt        sql.NullTime  `json:"finished_at"`
-	TotalDuration     sql.NullInt64 `json:"total_duration"`
-	TotalRestTime     sql.NullInt64 `json:"total_rest_time"`
-	TotalExerciseTime sql.NullInt64 `json:"total_exercise_time"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
 	Rating            sql.NullInt32 `json:"rating"`
 	Exercises         interface{}   `json:"exercises"`
 }
@@ -258,6 +325,7 @@ func (q *Queries) GetCurrentTraining(ctx context.Context, userID uuid.UUID) (Get
 	var i GetCurrentTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,
@@ -276,8 +344,10 @@ func (q *Queries) GetCurrentTraining(ctx context.Context, userID uuid.UUID) (Get
 const getExerciseByID = `-- name: GetExerciseByID :one
 SELECT 
     e.id,
+    e.title,
     e.description,
-    e.href,
+    e.video_url,
+    e.image_url,
     COALESCE(
         json_agg(
             json_build_object(
@@ -291,13 +361,15 @@ FROM exercise e
 LEFT JOIN exercise_to_tag et ON e.id = et.exercise_id
 LEFT JOIN tag t ON et.tag_id = t.id
 WHERE e.id = $1
-GROUP BY e.id, e.description, e.href
+GROUP BY e.id, e.description
 `
 
 type GetExerciseByIDRow struct {
 	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
 	Description string      `json:"description"`
-	Href        string      `json:"href"`
+	VideoUrl    string      `json:"video_url"`
+	ImageUrl    string      `json:"image_url"`
 	Tags        interface{} `json:"tags"`
 }
 
@@ -306,8 +378,10 @@ func (q *Queries) GetExerciseByID(ctx context.Context, id int64) (GetExerciseByI
 	var i GetExerciseByIDRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.Description,
-		&i.Href,
+		&i.VideoUrl,
+		&i.ImageUrl,
 		&i.Tags,
 	)
 	return i, err
@@ -316,8 +390,10 @@ func (q *Queries) GetExerciseByID(ctx context.Context, id int64) (GetExerciseByI
 const getExercisesByTag = `-- name: GetExercisesByTag :many
 SELECT 
     e.id,
+    e.title,
     e.description,
-    e.href
+    e.video_url,
+    e.image_url
 FROM exercise e
 INNER JOIN exercise_to_tag et ON e.id = et.exercise_id
 WHERE et.tag_id = $1
@@ -333,7 +409,13 @@ func (q *Queries) GetExercisesByTag(ctx context.Context, tagID int64) ([]Exercis
 	items := []Exercise{}
 	for rows.Next() {
 		var i Exercise
-		if err := rows.Scan(&i.ID, &i.Description, &i.Href); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.VideoUrl,
+			&i.ImageUrl,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -350,8 +432,10 @@ func (q *Queries) GetExercisesByTag(ctx context.Context, tagID int64) ([]Exercis
 const getExercisesWithTags = `-- name: GetExercisesWithTags :many
 SELECT 
     e.id,
+    e.title,
     e.description,
-    e.href,
+    e.video_url,
+    e.image_url,
     COALESCE(
         json_agg(
             json_build_object(
@@ -364,14 +448,16 @@ SELECT
 FROM exercise e
 LEFT JOIN exercise_to_tag et ON e.id = et.exercise_id
 LEFT JOIN tag t ON et.tag_id = t.id
-GROUP BY e.id, e.description, e.href
+GROUP BY e.id, e.description
 ORDER BY e.id
 `
 
 type GetExercisesWithTagsRow struct {
 	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
 	Description string      `json:"description"`
-	Href        string      `json:"href"`
+	VideoUrl    string      `json:"video_url"`
+	ImageUrl    string      `json:"image_url"`
 	Tags        interface{} `json:"tags"`
 }
 
@@ -386,8 +472,10 @@ func (q *Queries) GetExercisesWithTags(ctx context.Context) ([]GetExercisesWithT
 		var i GetExercisesWithTagsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.Title,
 			&i.Description,
-			&i.Href,
+			&i.VideoUrl,
+			&i.ImageUrl,
 			&i.Tags,
 		); err != nil {
 			return nil, err
@@ -403,16 +491,34 @@ func (q *Queries) GetExercisesWithTags(ctx context.Context) ([]GetExercisesWithT
 	return items, nil
 }
 
-const getGlobalTrainingByLevel = `-- name: GetGlobalTrainingByLevel :one
+const getGlobalTrainingByID = `-- name: GetGlobalTrainingByID :one
 SELECT 
     gt.id,
+    gt.title,
+    gt.description,
     gt.level,
     COALESCE(
         json_agg(
             json_build_object(
                 'id', e.id,
+                'title', e.title,
                 'description', e.description,
-                'href', e.href
+                'video_url', e.video_url,
+                'image_url', e.image_url,
+                'tags', COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id', t.id,
+                                'type', t.type
+                            )
+                        )
+                        FROM exercise_to_tag et2
+                        JOIN tag t ON et2.tag_id = t.id
+                        WHERE et2.exercise_id = e.id
+                    ),
+                    '[]'
+                )
             )
         ) FILTER (WHERE e.id IS NOT NULL),
         '[]'
@@ -420,44 +526,75 @@ SELECT
 FROM global_training gt
 LEFT JOIN global_training_exercise gte ON gt.id = gte.global_training_id
 LEFT JOIN exercise e ON gte.exercise_id = e.id
-WHERE gt.level = $1
+WHERE gt.id = $1
 GROUP BY gt.id, gt.level
 `
 
-type GetGlobalTrainingByLevelRow struct {
-	ID        int64       `json:"id"`
-	Level     string      `json:"level"`
-	Exercises interface{} `json:"exercises"`
+type GetGlobalTrainingByIDRow struct {
+	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Level       string      `json:"level"`
+	Exercises   interface{} `json:"exercises"`
 }
 
-// Получение глобальной тренировки по уровню
-func (q *Queries) GetGlobalTrainingByLevel(ctx context.Context, level string) (GetGlobalTrainingByLevelRow, error) {
-	row := q.db.QueryRowContext(ctx, getGlobalTrainingByLevel, level)
-	var i GetGlobalTrainingByLevelRow
-	err := row.Scan(&i.ID, &i.Level, &i.Exercises)
+// Получение глобальной тренировки по ID с упражнениями и их тегами
+func (q *Queries) GetGlobalTrainingByID(ctx context.Context, id int64) (GetGlobalTrainingByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getGlobalTrainingByID, id)
+	var i GetGlobalTrainingByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Description,
+		&i.Level,
+		&i.Exercises,
+	)
 	return i, err
 }
 
-const getGlobalTrainingWithTags = `-- name: GetGlobalTrainingWithTags :one
+const getGlobalTrainingById = `-- name: GetGlobalTrainingById :one
+SELECT id, level, title
+FROM global_training
+WHERE id = $1
+`
+
+type GetGlobalTrainingByIdRow struct {
+	ID    int64  `json:"id"`
+	Level string `json:"level"`
+	Title string `json:"title"`
+}
+
+func (q *Queries) GetGlobalTrainingById(ctx context.Context, id int64) (GetGlobalTrainingByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getGlobalTrainingById, id)
+	var i GetGlobalTrainingByIdRow
+	err := row.Scan(&i.ID, &i.Level, &i.Title)
+	return i, err
+}
+
+const getGlobalTrainingByLevel = `-- name: GetGlobalTrainingByLevel :many
 SELECT 
     gt.id,
+    gt.title,
+    gt.description,
     gt.level,
     COALESCE(
         json_agg(
-            DISTINCT json_build_object(
+            json_build_object(
                 'id', e.id,
+                'title', e.title,
                 'description', e.description,
-                'href', e.href,
+                'video_url', e.video_url,
+                'image_url', e.image_url,
                 'tags', COALESCE(
                     (
                         SELECT json_agg(
                             json_build_object(
-                                'id', t2.id,
-                                'type', t2.type
+                                'id', t.id,
+                                'type', t.type
                             )
                         )
                         FROM exercise_to_tag et2
-                        JOIN tag t2 ON et2.tag_id = t2.id
+                        JOIN tag t ON et2.tag_id = t.id
                         WHERE et2.exercise_id = e.id
                     ),
                     '[]'
@@ -471,32 +608,104 @@ LEFT JOIN global_training_exercise gte ON gt.id = gte.global_training_id
 LEFT JOIN exercise e ON gte.exercise_id = e.id
 WHERE gt.level = $1
 GROUP BY gt.id, gt.level
+ORDER BY gt.id
 `
 
-type GetGlobalTrainingWithTagsRow struct {
-	ID        int64       `json:"id"`
-	Level     string      `json:"level"`
-	Exercises interface{} `json:"exercises"`
+type GetGlobalTrainingByLevelRow struct {
+	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Level       string      `json:"level"`
+	Exercises   interface{} `json:"exercises"`
 }
 
-// Получение глобальной тренировки с тегами упражнений
-func (q *Queries) GetGlobalTrainingWithTags(ctx context.Context, level string) (GetGlobalTrainingWithTagsRow, error) {
-	row := q.db.QueryRowContext(ctx, getGlobalTrainingWithTags, level)
-	var i GetGlobalTrainingWithTagsRow
-	err := row.Scan(&i.ID, &i.Level, &i.Exercises)
-	return i, err
+// Получение глобальных тренировок по уровню с упражнениями и их тегами
+func (q *Queries) GetGlobalTrainingByLevel(ctx context.Context, level string) ([]GetGlobalTrainingByLevelRow, error) {
+	rows, err := q.db.QueryContext(ctx, getGlobalTrainingByLevel, level)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetGlobalTrainingByLevelRow{}
+	for rows.Next() {
+		var i GetGlobalTrainingByLevelRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Level,
+			&i.Exercises,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getGlobalTrainingExercises = `-- name: GetGlobalTrainingExercises :many
+SELECT gte.id, gte.global_training_id, gte.exercise_id
+FROM global_training_exercise gte
+WHERE gte.global_training_id = $1
+`
+
+func (q *Queries) GetGlobalTrainingExercises(ctx context.Context, globalTrainingID int64) ([]GlobalTrainingExercise, error) {
+	rows, err := q.db.QueryContext(ctx, getGlobalTrainingExercises, globalTrainingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GlobalTrainingExercise{}
+	for rows.Next() {
+		var i GlobalTrainingExercise
+		if err := rows.Scan(&i.ID, &i.GlobalTrainingID, &i.ExerciseID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getGlobalTrainings = `-- name: GetGlobalTrainings :many
 SELECT 
     gt.id,
+    gt.title,
+    gt.description,
     gt.level,
     COALESCE(
         json_agg(
             json_build_object(
                 'id', e.id,
+                'title', e.title,
                 'description', e.description,
-                'href', e.href
+                'video_url', e.video_url,
+                'image_url', e.image_url,
+                'tags', COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id', t.id,
+                                'type', t.type
+                            )
+                        )
+                        FROM exercise_to_tag et2
+                        JOIN tag t ON et2.tag_id = t.id
+                        WHERE et2.exercise_id = e.id
+                    ),
+                    '[]'
+                )
             )
         ) FILTER (WHERE e.id IS NOT NULL),
         '[]'
@@ -514,12 +723,14 @@ ORDER BY
 `
 
 type GetGlobalTrainingsRow struct {
-	ID        int64       `json:"id"`
-	Level     string      `json:"level"`
-	Exercises interface{} `json:"exercises"`
+	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Level       string      `json:"level"`
+	Exercises   interface{} `json:"exercises"`
 }
 
-// Получение всех глобальных тренировок
+// Получение всех глобальных тренировок с упражнениями и их тегами
 func (q *Queries) GetGlobalTrainings(ctx context.Context) ([]GetGlobalTrainingsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getGlobalTrainings)
 	if err != nil {
@@ -529,7 +740,13 @@ func (q *Queries) GetGlobalTrainings(ctx context.Context) ([]GetGlobalTrainingsR
 	items := []GetGlobalTrainingsRow{}
 	for rows.Next() {
 		var i GetGlobalTrainingsRow
-		if err := rows.Scan(&i.ID, &i.Level, &i.Exercises); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Level,
+			&i.Exercises,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -545,18 +762,30 @@ func (q *Queries) GetGlobalTrainings(ctx context.Context) ([]GetGlobalTrainingsR
 
 const getTodaysTraining = `-- name: GetTodaysTraining :many
 SELECT 
-    t.id, t.user_id, t.is_done, t.planned_date, t.actual_date, t.started_at, t.finished_at, t.total_duration, t.total_rest_time, t.total_exercise_time, t.rating,
+    t.id,
+    t.title,
+    t.user_id,
+    t.is_done,
+    t.planned_date,
+    t.actual_date,
+    t.started_at,
+    t.finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    t.rating,
     COALESCE(
         json_agg(
             json_build_object(
                 'id', te.id,
+                'training_id', te.training_id, 
                 'exercise_id', te.exercise_id,
                 'weight', te.weight,
                 'approaches', te.approaches,
                 'reps', te.reps,
-                'time', te.time,
-                'doing', te.doing,
-                'rest', te.rest,
+                'time', CAST(COALESCE(EXTRACT(EPOCH FROM te.time)::bigint, 0) as bigint),
+                'doing', CAST(COALESCE(EXTRACT(EPOCH FROM te.doing)::bigint, 0) as bigint),
+                'rest', CAST(COALESCE(EXTRACT(EPOCH FROM te.rest)::bigint, 0) as bigint),
                 'notes', te.notes
             )
         ) FILTER (WHERE te.id IS NOT NULL),
@@ -572,15 +801,16 @@ ORDER BY t.planned_date DESC
 
 type GetTodaysTrainingRow struct {
 	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
 	UserID            uuid.UUID     `json:"user_id"`
 	IsDone            bool          `json:"is_done"`
 	PlannedDate       time.Time     `json:"planned_date"`
 	ActualDate        sql.NullTime  `json:"actual_date"`
 	StartedAt         sql.NullTime  `json:"started_at"`
 	FinishedAt        sql.NullTime  `json:"finished_at"`
-	TotalDuration     sql.NullInt64 `json:"total_duration"`
-	TotalRestTime     sql.NullInt64 `json:"total_rest_time"`
-	TotalExerciseTime sql.NullInt64 `json:"total_exercise_time"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
 	Rating            sql.NullInt32 `json:"rating"`
 	Exercises         interface{}   `json:"exercises"`
 }
@@ -597,6 +827,7 @@ func (q *Queries) GetTodaysTraining(ctx context.Context, userID uuid.UUID) ([]Ge
 		var i GetTodaysTrainingRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.Title,
 			&i.UserID,
 			&i.IsDone,
 			&i.PlannedDate,
@@ -625,9 +856,9 @@ func (q *Queries) GetTodaysTraining(ctx context.Context, userID uuid.UUID) ([]Ge
 const getTrainingStats = `-- name: GetTrainingStats :one
 SELECT 
     t.id,
-    t.total_duration,
-    t.total_rest_time,
-    t.total_exercise_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
     COUNT(te.id) as exercise_count,
     COALESCE(SUM(te.approaches), 0) as total_approaches,
     COALESCE(SUM(te.reps), 0) as total_reps
@@ -638,13 +869,13 @@ GROUP BY t.id
 `
 
 type GetTrainingStatsRow struct {
-	ID                int64         `json:"id"`
-	TotalDuration     sql.NullInt64 `json:"total_duration"`
-	TotalRestTime     sql.NullInt64 `json:"total_rest_time"`
-	TotalExerciseTime sql.NullInt64 `json:"total_exercise_time"`
-	ExerciseCount     int64         `json:"exercise_count"`
-	TotalApproaches   interface{}   `json:"total_approaches"`
-	TotalReps         interface{}   `json:"total_reps"`
+	ID                int64       `json:"id"`
+	TotalDuration     int64       `json:"total_duration"`
+	TotalRestTime     int64       `json:"total_rest_time"`
+	TotalExerciseTime int64       `json:"total_exercise_time"`
+	ExerciseCount     int64       `json:"exercise_count"`
+	TotalApproaches   interface{} `json:"total_approaches"`
+	TotalReps         interface{} `json:"total_reps"`
 }
 
 // Получение статистики по тренировке (общее время выполнения и отдыха)
@@ -665,18 +896,30 @@ func (q *Queries) GetTrainingStats(ctx context.Context, id int64) (GetTrainingSt
 
 const getTrainingWithExercises = `-- name: GetTrainingWithExercises :one
 SELECT 
-    t.id, t.user_id, t.is_done, t.planned_date, t.actual_date, t.started_at, t.finished_at, t.total_duration, t.total_rest_time, t.total_exercise_time, t.rating,
+    t.id,
+    t.title,
+    t.user_id,
+    t.is_done,
+    t.planned_date,
+    t.actual_date,
+    t.started_at,
+    t.finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    t.rating,
     COALESCE(
         json_agg(
             json_build_object(
                 'id', te.id,
+                'training_id', te.training_id, 
                 'exercise_id', te.exercise_id,
                 'weight', te.weight,
                 'approaches', te.approaches,
                 'reps', te.reps,
-                'time', te.time,
-                'doing', te.doing,
-                'rest', te.rest,
+                'time', CAST(COALESCE(EXTRACT(EPOCH FROM te.time)::bigint, 0) as bigint),
+                'doing', CAST(COALESCE(EXTRACT(EPOCH FROM te.doing)::bigint, 0) as bigint),
+                'rest', CAST(COALESCE(EXTRACT(EPOCH FROM te.rest)::bigint, 0) as bigint),
                 'notes', te.notes
             )
         ) FILTER (WHERE te.id IS NOT NULL),
@@ -690,15 +933,16 @@ GROUP BY t.id
 
 type GetTrainingWithExercisesRow struct {
 	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
 	UserID            uuid.UUID     `json:"user_id"`
 	IsDone            bool          `json:"is_done"`
 	PlannedDate       time.Time     `json:"planned_date"`
 	ActualDate        sql.NullTime  `json:"actual_date"`
 	StartedAt         sql.NullTime  `json:"started_at"`
 	FinishedAt        sql.NullTime  `json:"finished_at"`
-	TotalDuration     sql.NullInt64 `json:"total_duration"`
-	TotalRestTime     sql.NullInt64 `json:"total_rest_time"`
-	TotalExerciseTime sql.NullInt64 `json:"total_exercise_time"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
 	Rating            sql.NullInt32 `json:"rating"`
 	Exercises         interface{}   `json:"exercises"`
 }
@@ -708,6 +952,7 @@ func (q *Queries) GetTrainingWithExercises(ctx context.Context, id int64) (GetTr
 	var i GetTrainingWithExercisesRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,
@@ -726,32 +971,17 @@ func (q *Queries) GetTrainingWithExercises(ctx context.Context, id int64) (GetTr
 const getTrainingsByUser = `-- name: GetTrainingsByUser :many
 SELECT 
     t.id,
+    t.title,
     t.user_id,
     t.is_done,
     t.planned_date,
     t.actual_date,
     t.started_at,
     t.finished_at,
-    t.total_duration,
-    t.total_rest_time,
-    t.total_exercise_time,
-    t.rating,
-    COALESCE(
-        json_agg(
-            json_build_object(
-                'id', te.id,
-                'exercise_id', te.exercise_id,
-                'weight', te.weight,
-                'approaches', te.approaches,
-                'reps', te.reps,
-                'time', te.time,
-                'doing', te.doing,
-                'rest', te.rest,
-                'notes', te.notes
-            )
-        ) FILTER (WHERE te.id IS NOT NULL),
-        '[]'
-    ) as exercises
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM t.total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    t.rating
 FROM training t
 LEFT JOIN trained_exercise te ON t.id = te.training_id
 WHERE t.user_id = $1
@@ -761,17 +991,17 @@ ORDER BY t.planned_date DESC
 
 type GetTrainingsByUserRow struct {
 	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
 	UserID            uuid.UUID     `json:"user_id"`
 	IsDone            bool          `json:"is_done"`
 	PlannedDate       time.Time     `json:"planned_date"`
 	ActualDate        sql.NullTime  `json:"actual_date"`
 	StartedAt         sql.NullTime  `json:"started_at"`
 	FinishedAt        sql.NullTime  `json:"finished_at"`
-	TotalDuration     sql.NullInt64 `json:"total_duration"`
-	TotalRestTime     sql.NullInt64 `json:"total_rest_time"`
-	TotalExerciseTime sql.NullInt64 `json:"total_exercise_time"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
 	Rating            sql.NullInt32 `json:"rating"`
-	Exercises         interface{}   `json:"exercises"`
 }
 
 func (q *Queries) GetTrainingsByUser(ctx context.Context, userID uuid.UUID) ([]GetTrainingsByUserRow, error) {
@@ -785,6 +1015,7 @@ func (q *Queries) GetTrainingsByUser(ctx context.Context, userID uuid.UUID) ([]G
 		var i GetTrainingsByUserRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.Title,
 			&i.UserID,
 			&i.IsDone,
 			&i.PlannedDate,
@@ -795,7 +1026,6 @@ func (q *Queries) GetTrainingsByUser(ctx context.Context, userID uuid.UUID) ([]G
 			&i.TotalRestTime,
 			&i.TotalExerciseTime,
 			&i.Rating,
-			&i.Exercises,
 		); err != nil {
 			return nil, err
 		}
@@ -817,7 +1047,19 @@ SET
     actual_date = CURRENT_DATE,
     finished_at = COALESCE($1, CURRENT_TIMESTAMP)
 WHERE id = $2 AND user_id = $3
-RETURNING id, user_id, is_done, planned_date, actual_date, started_at, finished_at, total_duration, total_rest_time, total_exercise_time, rating
+RETURNING 
+    id,
+    title,
+    user_id,
+    is_done,
+    planned_date,
+    actual_date,
+    started_at,
+    finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    rating
 `
 
 type MarkTrainingAsDoneParams struct {
@@ -826,12 +1068,28 @@ type MarkTrainingAsDoneParams struct {
 	UserID     uuid.UUID    `json:"user_id"`
 }
 
+type MarkTrainingAsDoneRow struct {
+	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
+	UserID            uuid.UUID     `json:"user_id"`
+	IsDone            bool          `json:"is_done"`
+	PlannedDate       time.Time     `json:"planned_date"`
+	ActualDate        sql.NullTime  `json:"actual_date"`
+	StartedAt         sql.NullTime  `json:"started_at"`
+	FinishedAt        sql.NullTime  `json:"finished_at"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
+	Rating            sql.NullInt32 `json:"rating"`
+}
+
 // Отметить тренировку как выполненную
-func (q *Queries) MarkTrainingAsDone(ctx context.Context, arg MarkTrainingAsDoneParams) (Training, error) {
+func (q *Queries) MarkTrainingAsDone(ctx context.Context, arg MarkTrainingAsDoneParams) (MarkTrainingAsDoneRow, error) {
 	row := q.db.QueryRowContext(ctx, markTrainingAsDone, arg.FinishedAt, arg.ID, arg.UserID)
-	var i Training
+	var i MarkTrainingAsDoneRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,
@@ -852,7 +1110,19 @@ SET
     started_at = COALESCE($1, CURRENT_TIMESTAMP),
     is_done = false
 WHERE id = $2 AND user_id = $3
-RETURNING id, user_id, is_done, planned_date, actual_date, started_at, finished_at, total_duration, total_rest_time, total_exercise_time, rating
+RETURNING 
+    id,
+    title,
+    user_id,
+    is_done,
+    planned_date,
+    actual_date,
+    started_at,
+    finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    rating
 `
 
 type StartTrainingParams struct {
@@ -861,12 +1131,28 @@ type StartTrainingParams struct {
 	UserID    uuid.UUID    `json:"user_id"`
 }
 
+type StartTrainingRow struct {
+	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
+	UserID            uuid.UUID     `json:"user_id"`
+	IsDone            bool          `json:"is_done"`
+	PlannedDate       time.Time     `json:"planned_date"`
+	ActualDate        sql.NullTime  `json:"actual_date"`
+	StartedAt         sql.NullTime  `json:"started_at"`
+	FinishedAt        sql.NullTime  `json:"finished_at"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
+	Rating            sql.NullInt32 `json:"rating"`
+}
+
 // Начать тренировку (установить время начала)
-func (q *Queries) StartTraining(ctx context.Context, arg StartTrainingParams) (Training, error) {
+func (q *Queries) StartTraining(ctx context.Context, arg StartTrainingParams) (StartTrainingRow, error) {
 	row := q.db.QueryRowContext(ctx, startTraining, arg.StartedAt, arg.ID, arg.UserID)
-	var i Training
+	var i StartTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,
@@ -887,28 +1173,49 @@ SET
     doing = COALESCE($1, doing),
     rest = COALESCE($2, rest),
     time = COALESCE($3, time)  -- Общее время упражнения (doing + rest)
-WHERE id = $4 AND training_id = $5
-RETURNING id, training_id, exercise_id, weight, approaches, reps, time, doing, rest, notes
+WHERE id = $4
+RETURNING 
+    id,
+    training_id,
+    exercise_id,
+    weight,
+    approaches,
+    reps,
+    CAST(COALESCE(EXTRACT(EPOCH FROM time)::bigint, 0) as bigint) as time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM doing)::bigint, 0)as bigint) as doing,
+    CAST(COALESCE(EXTRACT(EPOCH FROM rest)::bigint, 0)as bigint) as rest,
+    notes
 `
 
 type UpdateExerciseTimeParams struct {
-	Doing      sql.NullInt64 `json:"doing"`
-	Rest       sql.NullInt64 `json:"rest"`
-	Time       sql.NullInt64 `json:"time"`
-	ID         int64         `json:"id"`
-	TrainingID int64         `json:"training_id"`
+	Doing sql.NullInt64 `json:"doing"`
+	Rest  sql.NullInt64 `json:"rest"`
+	Time  sql.NullInt64 `json:"time"`
+	ID    int64         `json:"id"`
+}
+
+type UpdateExerciseTimeRow struct {
+	ID         int64          `json:"id"`
+	TrainingID int64          `json:"training_id"`
+	ExerciseID int64          `json:"exercise_id"`
+	Weight     sql.NullString `json:"weight"`
+	Approaches sql.NullInt32  `json:"approaches"`
+	Reps       sql.NullInt32  `json:"reps"`
+	Time       int64          `json:"time"`
+	Doing      int64          `json:"doing"`
+	Rest       int64          `json:"rest"`
+	Notes      sql.NullString `json:"notes"`
 }
 
 // Обновление времени выполнения упражнения (doing) и времени отдыха (rest)
-func (q *Queries) UpdateExerciseTime(ctx context.Context, arg UpdateExerciseTimeParams) (TrainedExercise, error) {
+func (q *Queries) UpdateExerciseTime(ctx context.Context, arg UpdateExerciseTimeParams) (UpdateExerciseTimeRow, error) {
 	row := q.db.QueryRowContext(ctx, updateExerciseTime,
 		arg.Doing,
 		arg.Rest,
 		arg.Time,
 		arg.ID,
-		arg.TrainingID,
 	)
-	var i TrainedExercise
+	var i UpdateExerciseTimeRow
 	err := row.Scan(
 		&i.ID,
 		&i.TrainingID,
@@ -935,7 +1242,17 @@ SET
     rest = COALESCE($6, rest),
     notes = COALESCE($7, notes)
 WHERE id = $8
-RETURNING id, training_id, exercise_id, weight, approaches, reps, time, doing, rest, notes
+RETURNING 
+    id,
+    training_id,
+    exercise_id,
+    weight,
+    approaches,
+    reps,
+    CAST(COALESCE(EXTRACT(EPOCH FROM time)::bigint, 0) as bigint) as time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM doing)::bigint, 0)as bigint) as doing,
+    CAST(COALESCE(EXTRACT(EPOCH FROM rest)::bigint, 0)as bigint) as rest,
+    notes
 `
 
 type UpdateTrainedExerciseParams struct {
@@ -949,7 +1266,20 @@ type UpdateTrainedExerciseParams struct {
 	ID         int64          `json:"id"`
 }
 
-func (q *Queries) UpdateTrainedExercise(ctx context.Context, arg UpdateTrainedExerciseParams) (TrainedExercise, error) {
+type UpdateTrainedExerciseRow struct {
+	ID         int64          `json:"id"`
+	TrainingID int64          `json:"training_id"`
+	ExerciseID int64          `json:"exercise_id"`
+	Weight     sql.NullString `json:"weight"`
+	Approaches sql.NullInt32  `json:"approaches"`
+	Reps       sql.NullInt32  `json:"reps"`
+	Time       int64          `json:"time"`
+	Doing      int64          `json:"doing"`
+	Rest       int64          `json:"rest"`
+	Notes      sql.NullString `json:"notes"`
+}
+
+func (q *Queries) UpdateTrainedExercise(ctx context.Context, arg UpdateTrainedExerciseParams) (UpdateTrainedExerciseRow, error) {
 	row := q.db.QueryRowContext(ctx, updateTrainedExercise,
 		arg.Weight,
 		arg.Approaches,
@@ -960,7 +1290,7 @@ func (q *Queries) UpdateTrainedExercise(ctx context.Context, arg UpdateTrainedEx
 		arg.Notes,
 		arg.ID,
 	)
-	var i TrainedExercise
+	var i UpdateTrainedExerciseRow
 	err := row.Scan(
 		&i.ID,
 		&i.TrainingID,
@@ -978,7 +1308,7 @@ func (q *Queries) UpdateTrainedExercise(ctx context.Context, arg UpdateTrainedEx
 
 const updateTraining = `-- name: UpdateTraining :one
 UPDATE training
-SET 
+SET
     is_done = COALESCE($1, is_done),
     planned_date = COALESCE($2, planned_date),
     actual_date = COALESCE($3, actual_date),
@@ -987,9 +1317,22 @@ SET
     total_duration = COALESCE($6, total_duration),
     total_rest_time = COALESCE($7, total_rest_time),
     total_exercise_time = COALESCE($8, total_exercise_time),
-    rating = COALESCE($9, rating)
-WHERE id = $10
-RETURNING id, user_id, is_done, planned_date, actual_date, started_at, finished_at, total_duration, total_rest_time, total_exercise_time, rating
+    rating = COALESCE($9, rating),
+    title = COALESCE($10, title)
+WHERE id = $11
+RETURNING 
+    id,
+    title,
+    user_id,
+    is_done,
+    planned_date,
+    actual_date,
+    started_at,
+    finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    rating
 `
 
 type UpdateTrainingParams struct {
@@ -1002,10 +1345,26 @@ type UpdateTrainingParams struct {
 	TotalRestTime     sql.NullInt64 `json:"total_rest_time"`
 	TotalExerciseTime sql.NullInt64 `json:"total_exercise_time"`
 	Rating            sql.NullInt32 `json:"rating"`
+	Title             string        `json:"title"`
 	ID                int64         `json:"id"`
 }
 
-func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) (Training, error) {
+type UpdateTrainingRow struct {
+	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
+	UserID            uuid.UUID     `json:"user_id"`
+	IsDone            bool          `json:"is_done"`
+	PlannedDate       time.Time     `json:"planned_date"`
+	ActualDate        sql.NullTime  `json:"actual_date"`
+	StartedAt         sql.NullTime  `json:"started_at"`
+	FinishedAt        sql.NullTime  `json:"finished_at"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
+	Rating            sql.NullInt32 `json:"rating"`
+}
+
+func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) (UpdateTrainingRow, error) {
 	row := q.db.QueryRowContext(ctx, updateTraining,
 		arg.IsDone,
 		arg.PlannedDate,
@@ -1016,11 +1375,13 @@ func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) 
 		arg.TotalRestTime,
 		arg.TotalExerciseTime,
 		arg.Rating,
+		arg.Title,
 		arg.ID,
 	)
-	var i Training
+	var i UpdateTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,
@@ -1044,7 +1405,19 @@ SET
     total_rest_time = COALESCE($4, total_rest_time),
     total_exercise_time = COALESCE($5, total_exercise_time)
 WHERE id = $6
-RETURNING id, user_id, is_done, planned_date, actual_date, started_at, finished_at, total_duration, total_rest_time, total_exercise_time, rating
+RETURNING 
+    id,
+    title,
+    user_id,
+    is_done,
+    planned_date,
+    actual_date,
+    started_at,
+    finished_at,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_duration)::bigint, 0) as bigint) as total_duration,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_rest_time)::bigint, 0)as bigint) as total_rest_time,
+    CAST(COALESCE(EXTRACT(EPOCH FROM total_exercise_time)::bigint, 0)as bigint) as total_exercise_time,
+    rating
 `
 
 type UpdateTrainingTimersParams struct {
@@ -1056,8 +1429,23 @@ type UpdateTrainingTimersParams struct {
 	ID                int64         `json:"id"`
 }
 
+type UpdateTrainingTimersRow struct {
+	ID                int64         `json:"id"`
+	Title             string        `json:"title"`
+	UserID            uuid.UUID     `json:"user_id"`
+	IsDone            bool          `json:"is_done"`
+	PlannedDate       time.Time     `json:"planned_date"`
+	ActualDate        sql.NullTime  `json:"actual_date"`
+	StartedAt         sql.NullTime  `json:"started_at"`
+	FinishedAt        sql.NullTime  `json:"finished_at"`
+	TotalDuration     int64         `json:"total_duration"`
+	TotalRestTime     int64         `json:"total_rest_time"`
+	TotalExerciseTime int64         `json:"total_exercise_time"`
+	Rating            sql.NullInt32 `json:"rating"`
+}
+
 // Обновление времени тренировки (старт, финиш, общая продолжительность)
-func (q *Queries) UpdateTrainingTimers(ctx context.Context, arg UpdateTrainingTimersParams) (Training, error) {
+func (q *Queries) UpdateTrainingTimers(ctx context.Context, arg UpdateTrainingTimersParams) (UpdateTrainingTimersRow, error) {
 	row := q.db.QueryRowContext(ctx, updateTrainingTimers,
 		arg.StartedAt,
 		arg.FinishedAt,
@@ -1066,9 +1454,10 @@ func (q *Queries) UpdateTrainingTimers(ctx context.Context, arg UpdateTrainingTi
 		arg.TotalExerciseTime,
 		arg.ID,
 	)
-	var i Training
+	var i UpdateTrainingTimersRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.UserID,
 		&i.IsDone,
 		&i.PlannedDate,

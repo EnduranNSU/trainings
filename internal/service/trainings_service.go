@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -15,6 +16,8 @@ var (
 	ErrTrainingNotFound  = errors.New("training not found")
 	ErrInvalidUserID     = errors.New("invalid user id")
 	ErrTrainingNotActive = errors.New("training is not active")
+	ErrInvalidGlobalTrainingID = errors.New("invalid global training id")
+    ErrGlobalTrainingNotFound  = errors.New("global training not found")
 )
 
 func NewTrainingService(repo domain.TrainingRepository) domain.TrainingService {
@@ -299,30 +302,18 @@ func (s *trainingService) GetGlobalTrainings(ctx context.Context) ([]*domain.Glo
 	return s.repo.GetGlobalTrainings(ctx)
 }
 
-func (s *trainingService) GetGlobalTrainingByLevel(ctx context.Context, level string) (*domain.GlobalTraining, error) {
+func (s *trainingService) GetGlobalTrainingByLevel(ctx context.Context, level string) ([]*domain.GlobalTraining, error) {
 	if level == "" {
 		return nil, errors.New("level is required")
 	}
-
 	return s.repo.GetGlobalTrainingByLevel(ctx, level)
 }
 
-func (s *trainingService) GetGlobalTrainingWithTags(ctx context.Context, level string) (*domain.GlobalTraining, error) {
-	if level == "" {
-		return nil, errors.New("level is required")
-	}
-
-	// Получаем глобальную тренировку с тегами
-	globalTraining, err := s.repo.GetGlobalTrainingWithTags(ctx, level)
+func (s *trainingService) GetGlobalTrainingById(ctx context.Context, trainingID int64) (*domain.GlobalTraining, error) {
+	globalTraining, err := s.repo.GetGlobalTrainingById(ctx, trainingID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Можно добавить дополнительную логику, например:
-	// 1. Валидацию наличия упражнений
-	// 2. Проверку доступности ресурсов
-	// 3. Логирование запросов
-
 	return globalTraining, nil
 }
 
@@ -466,50 +457,31 @@ func (s *trainingService) ResumeTraining(ctx context.Context, trainingID int64) 
 	return training, nil
 }
 
-// Метод для копирования глобальной тренировки в пользовательскую
-func (s *trainingService) CopyGlobalTrainingToUser(ctx context.Context, level string, userID uuid.UUID, plannedDate time.Time) (*domain.Training, error) {
-	if userID == uuid.Nil {
-		return nil, ErrInvalidUserID
-	}
-	if level == "" {
-		return nil, errors.New("level is required")
-	}
-	if plannedDate.IsZero() {
-		return nil, errors.New("planned date is required")
-	}
+// Реализация метода в trainingService структуре
+func (s *trainingService) AssignGlobalTraining(ctx context.Context, cmd domain.AssignGlobalTrainingCmd) (*domain.Training, error) {
+    // Валидация входных данных
+    if cmd.UserID == uuid.Nil {
+        return nil, ErrInvalidUserID
+    }
+    if cmd.GlobalTrainingID <= 0 {
+        return nil, ErrInvalidGlobalTrainingID
+    }
 
-	// Получаем глобальную тренировку
-	globalTraining, err := s.repo.GetGlobalTrainingWithTags(ctx, level)
-	if err != nil {
-		return nil, err
-	}
+    // Вызываем метод репозитория для назначения глобальной тренировки
+    training, err := s.repo.AssignGlobalTrainingToUser(ctx, cmd)
+    if err != nil {
+        // Обрабатываем возможные ошибки
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, ErrGlobalTrainingNotFound
+        }
+        return nil, err
+    }
 
-	// Создаем новую тренировку для пользователя
-	training := &domain.Training{
-		UserID:      userID,
-		IsDone:      false,
-		PlannedDate: plannedDate,
-		Exercises:   []domain.TrainedExercise{},
-	}
+    // Можно добавить дополнительную бизнес-логику:
+    // 1. Отправка уведомления пользователю
+    // 2. Создание напоминаний
+    // 3. Логирование события
+    // 4. Обновление статистики пользователя
 
-	// Создаем тренировку
-	createdTraining, err := s.repo.CreateTraining(ctx, training)
-	if err != nil {
-		return nil, err
-	}
-
-	// Добавляем упражнения из глобальной тренировки
-	for _, exercise := range globalTraining.Exercises {
-		_, err := s.repo.AddExerciseToTraining(ctx, &domain.TrainedExercise{
-			TrainingID: createdTraining.ID,
-			ExerciseID: exercise.ID,
-		})
-		if err != nil {
-			// В случае ошибки можно удалить созданную тренировку или продолжить
-			return nil, err
-		}
-	}
-
-	// Получаем полную тренировку с упражнениями
-	return s.repo.GetTrainingWithExercises(ctx, createdTraining.ID)
+    return training, nil
 }

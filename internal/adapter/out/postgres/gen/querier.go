@@ -11,10 +11,10 @@ import (
 )
 
 type Querier interface {
-	AddExerciseToTraining(ctx context.Context, arg AddExerciseToTrainingParams) (TrainedExercise, error)
+	AddExerciseToTraining(ctx context.Context, arg AddExerciseToTrainingParams) (AddExerciseToTrainingRow, error)
 	// Расчет общего времени тренировки на основе всех упражнений
 	CalculateTrainingTotalTime(ctx context.Context, trainingID int64) (CalculateTrainingTotalTimeRow, error)
-	CreateTraining(ctx context.Context, arg CreateTrainingParams) (Training, error)
+	CreateTraining(ctx context.Context, arg CreateTrainingParams) (CreateTrainingRow, error)
 	DeleteExerciseFromTraining(ctx context.Context, arg DeleteExerciseFromTrainingParams) error
 	DeleteTrainingAndExercises(ctx context.Context, id int64) error
 	GetAllTags(ctx context.Context) ([]Tag, error)
@@ -23,11 +23,13 @@ type Querier interface {
 	GetExerciseByID(ctx context.Context, id int64) (GetExerciseByIDRow, error)
 	GetExercisesByTag(ctx context.Context, tagID int64) ([]Exercise, error)
 	GetExercisesWithTags(ctx context.Context) ([]GetExercisesWithTagsRow, error)
-	// Получение глобальной тренировки по уровню
-	GetGlobalTrainingByLevel(ctx context.Context, level string) (GetGlobalTrainingByLevelRow, error)
-	// Получение глобальной тренировки с тегами упражнений
-	GetGlobalTrainingWithTags(ctx context.Context, level string) (GetGlobalTrainingWithTagsRow, error)
-	// Получение всех глобальных тренировок
+	// Получение глобальной тренировки по ID с упражнениями и их тегами
+	GetGlobalTrainingByID(ctx context.Context, id int64) (GetGlobalTrainingByIDRow, error)
+	GetGlobalTrainingById(ctx context.Context, id int64) (GetGlobalTrainingByIdRow, error)
+	// Получение глобальных тренировок по уровню с упражнениями и их тегами
+	GetGlobalTrainingByLevel(ctx context.Context, level string) ([]GetGlobalTrainingByLevelRow, error)
+	GetGlobalTrainingExercises(ctx context.Context, globalTrainingID int64) ([]GlobalTrainingExercise, error)
+	// Получение всех глобальных тренировок с упражнениями и их тегами
 	GetGlobalTrainings(ctx context.Context) ([]GetGlobalTrainingsRow, error)
 	// Получение всех тренировок на сегодня для пользователя
 	GetTodaysTraining(ctx context.Context, userID uuid.UUID) ([]GetTodaysTrainingRow, error)
@@ -36,15 +38,15 @@ type Querier interface {
 	GetTrainingWithExercises(ctx context.Context, id int64) (GetTrainingWithExercisesRow, error)
 	GetTrainingsByUser(ctx context.Context, userID uuid.UUID) ([]GetTrainingsByUserRow, error)
 	// Отметить тренировку как выполненную
-	MarkTrainingAsDone(ctx context.Context, arg MarkTrainingAsDoneParams) (Training, error)
+	MarkTrainingAsDone(ctx context.Context, arg MarkTrainingAsDoneParams) (MarkTrainingAsDoneRow, error)
 	// Начать тренировку (установить время начала)
-	StartTraining(ctx context.Context, arg StartTrainingParams) (Training, error)
+	StartTraining(ctx context.Context, arg StartTrainingParams) (StartTrainingRow, error)
 	// Обновление времени выполнения упражнения (doing) и времени отдыха (rest)
-	UpdateExerciseTime(ctx context.Context, arg UpdateExerciseTimeParams) (TrainedExercise, error)
-	UpdateTrainedExercise(ctx context.Context, arg UpdateTrainedExerciseParams) (TrainedExercise, error)
-	UpdateTraining(ctx context.Context, arg UpdateTrainingParams) (Training, error)
+	UpdateExerciseTime(ctx context.Context, arg UpdateExerciseTimeParams) (UpdateExerciseTimeRow, error)
+	UpdateTrainedExercise(ctx context.Context, arg UpdateTrainedExerciseParams) (UpdateTrainedExerciseRow, error)
+	UpdateTraining(ctx context.Context, arg UpdateTrainingParams) (UpdateTrainingRow, error)
 	// Обновление времени тренировки (старт, финиш, общая продолжительность)
-	UpdateTrainingTimers(ctx context.Context, arg UpdateTrainingTimersParams) (Training, error)
+	UpdateTrainingTimers(ctx context.Context, arg UpdateTrainingTimersParams) (UpdateTrainingTimersRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

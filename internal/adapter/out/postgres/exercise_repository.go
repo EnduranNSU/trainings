@@ -29,7 +29,6 @@ func (r *ExerciseRepositoryImpl) GetExercisesWithTags(ctx context.Context) ([]*d
 		logging.Error(err, "GetExercisesWithTags", nil, "failed to get exercises with tags")
 		return nil, err
 	}
-
 	result := make([]*domain.Exercise, len(exercises))
 	for i, e := range exercises {
 		result[i] = r.toDomainExercise(e)
@@ -37,9 +36,9 @@ func (r *ExerciseRepositoryImpl) GetExercisesWithTags(ctx context.Context) ([]*d
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
 		"exercises_count": len(result),
+		"exercises":       result,
 	})
 	logging.Debug("GetExercisesWithTags", jsonData, "successfully retrieved exercises with tags")
-
 	return result, nil
 }
 
@@ -64,8 +63,8 @@ func (r *ExerciseRepositoryImpl) GetExerciseByID(ctx context.Context, id int64) 
 	domainExercise := r.toDomainExerciseFromJoined(exercise)
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"exercise_id":    id,
-		"tags_count":     len(domainExercise.Tags),
+		"exercise_id": id,
+		"tags_count":  len(domainExercise.Tags),
 	})
 	logging.Debug("GetExerciseByID", jsonData, "successfully retrieved exercise by id")
 
@@ -87,13 +86,13 @@ func (r *ExerciseRepositoryImpl) GetExercisesByTag(ctx context.Context, tagID in
 		result[i] = &domain.Exercise{
 			ID:          e.ID,
 			Description: e.Description,
-			Href:        e.Href,
-			// Tags будут загружены отдельно при необходимости
+			VideoUrl:    e.VideoUrl,
+			ImageUrl:    e.ImageUrl,
 		}
 	}
 
 	jsonData := logging.MarshalLogData(map[string]interface{}{
-		"tag_id":         tagID,
+		"tag_id":          tagID,
 		"exercises_count": len(result),
 	})
 	logging.Debug("GetExercisesByTag", jsonData, "successfully retrieved exercises by tag")
@@ -121,7 +120,7 @@ func (r *ExerciseRepositoryImpl) SearchExercises(ctx context.Context, filter dom
 	if filter.Search != nil && *filter.Search != "" {
 		var filtered []*domain.Exercise
 		for _, exercise := range exercises {
-			if strings.Contains(strings.ToLower(exercise.Description), strings.ToLower(*filter.Search)) {
+			if strings.Contains(strings.ToLower(exercise.Title), strings.ToLower(*filter.Search)) {
 				filtered = append(filtered, exercise)
 			}
 		}
@@ -200,7 +199,6 @@ func (r *ExerciseRepositoryImpl) GetTagByID(ctx context.Context, id int64) (*dom
 	return nil, sql.ErrNoRows
 }
 
-
 func (r *ExerciseRepositoryImpl) GetExerciseTags(ctx context.Context, exerciseID int64) ([]*domain.Tag, error) {
 	exercise, err := r.GetExerciseByID(ctx, exerciseID)
 	if err != nil {
@@ -210,7 +208,7 @@ func (r *ExerciseRepositoryImpl) GetExerciseTags(ctx context.Context, exerciseID
 		logging.Error(err, "GetExerciseTags", jsonData, "failed to get exercise tags")
 		return nil, err
 	}
-	
+
 	// Преобразуем []domain.Tag в []*domain.Tag
 	tags := make([]*domain.Tag, len(exercise.Tags))
 	for i := range exercise.Tags {
@@ -226,51 +224,24 @@ func (r *ExerciseRepositoryImpl) GetExerciseTags(ctx context.Context, exerciseID
 	return tags, nil
 }
 
-// Вспомогательные методы для преобразования данных (остаются без изменений)
 func (r *ExerciseRepositoryImpl) toDomainExercise(e gen.GetExercisesWithTagsRow) *domain.Exercise {
-	exercise := &domain.Exercise{
+	return &domain.Exercise{
 		ID:          e.ID,
+		Title:       e.Title,
 		Description: e.Description,
-		Href:        e.Href,
+		VideoUrl:    e.VideoUrl,
+		ImageUrl:    e.ImageUrl,
+		Tags:        toDomainTags(e.Tags),
 	}
-
-	// Преобразование тегов из JSON
-	if e.Tags != nil {
-		if tagsSlice, ok := e.Tags.([]gen.Tag); ok && len(tagsSlice) > 0 {
-			tags := make([]domain.Tag, len(tagsSlice))
-			for i, tag := range tagsSlice {
-				tags[i] = domain.Tag{
-					ID:   tag.ID,
-					Type: tag.Type,
-				}
-			}
-			exercise.Tags = tags
-		}
-	}
-
-	return exercise
 }
 
 func (r *ExerciseRepositoryImpl) toDomainExerciseFromJoined(e gen.GetExerciseByIDRow) *domain.Exercise {
-	exercise := &domain.Exercise{
+	return &domain.Exercise{
 		ID:          e.ID,
+		Title:       e.Title,
 		Description: e.Description,
-		Href:        e.Href,
+		VideoUrl:    e.VideoUrl,
+		ImageUrl:    e.ImageUrl,
+		Tags:        toDomainTags(e.Tags),
 	}
-
-	// Преобразование тегов из JSON
-	if e.Tags != nil {
-		if tagsSlice, ok := e.Tags.([]gen.Tag); ok && len(tagsSlice) > 0 {
-			tags := make([]domain.Tag, len(tagsSlice))
-			for i, tag := range tagsSlice {
-				tags[i] = domain.Tag{
-					ID:   tag.ID,
-					Type: tag.Type,
-				}
-			}
-			exercise.Tags = tags
-		}
-	}
-
-	return exercise
 }
